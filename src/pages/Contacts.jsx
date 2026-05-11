@@ -6,6 +6,7 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import EmptyState from '@/components/ui/EmptyState';
 import { Users, Search, Phone, MessageCircle, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import ContactModal from '@/components/contacts/ContactModal';
 
 const TAG_FILTERS = ['All', 'Seller', 'Buyer', 'Both', 'Client'];
 
@@ -15,6 +16,7 @@ export default function Contacts() {
   const [search, setSearch] = useState('');
   const [tagFilter, setTagFilter] = useState('All');
   const [loading, setLoading] = useState(true);
+  const [selectedContact, setSelectedContact] = useState(null);
 
   useEffect(() => {
     getNetworkContacts({ search })
@@ -30,6 +32,7 @@ export default function Contacts() {
 
   return (
     <div className="p-6 animate-fade-in">
+      {selectedContact && <ContactModal contact={selectedContact} onClose={() => setSelectedContact(null)} />}
       <PageHeader
         title="Network & Contacts"
         subtitle={`${contacts.length.toLocaleString()} contacts`}
@@ -78,7 +81,7 @@ export default function Contacts() {
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {filtered.map(c => (
-            <div key={c.id} className="bg-card border border-hairline rounded-xl p-4 hover:border-hairline-strong hover:shadow-sm transition-all cursor-pointer">
+            <div key={c.id} onClick={() => setSelectedContact(c)} className="bg-card border border-hairline rounded-xl p-4 hover:border-hairline-strong hover:shadow-sm transition-all cursor-pointer">
               <div className="flex items-start gap-3">
                 <div className="w-9 h-9 rounded-full bg-evergreen-tint flex items-center justify-center shrink-0">
                   <span className="text-sm font-semibold text-evergreen">

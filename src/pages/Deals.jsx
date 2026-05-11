@@ -4,14 +4,16 @@ import PageHeader from '@/components/ui/PageHeader';
 import StatusBadge from '@/components/ui/StatusBadge';
 import KpiCard from '@/components/ui/KpiCard';
 import EmptyState from '@/components/ui/EmptyState';
-import { BarChart3, Plus, AlertTriangle } from 'lucide-react';
+import { BarChart3, Plus, AlertTriangle, LayoutGrid, List } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import DealKanban from '@/components/deals/DealKanban';
 
 const STAGES = ['Offer', 'MOU', 'NOC', 'Trustee', 'Transfer', 'Closed'];
 
 export default function Deals() {
   const [deals, setDeals] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState('kanban');
 
   useEffect(() => {
     getDeals().then(setDeals).catch(() => setDeals([])).finally(() => setLoading(false));
@@ -38,9 +40,19 @@ export default function Deals() {
         title="Deals & Transactions"
         subtitle={`${deals.length} active deals`}
         actions={
-          <button className="px-3 py-1.5 text-sm rounded-lg bg-evergreen text-white font-medium flex items-center gap-1.5 hover:bg-evergreen-mid transition-colors">
-            <Plus className="w-3.5 h-3.5" /> New deal
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="flex rounded-lg border border-hairline overflow-hidden">
+              <button onClick={() => setView('kanban')} className={cn('px-2.5 py-1.5 text-xs font-medium transition-colors flex items-center gap-1', view === 'kanban' ? 'bg-evergreen text-white' : 'bg-card text-muted-foreground hover:bg-surface')}>
+                <LayoutGrid className="w-3.5 h-3.5" /> Kanban
+              </button>
+              <button onClick={() => setView('list')} className={cn('px-2.5 py-1.5 text-xs font-medium transition-colors flex items-center gap-1', view === 'list' ? 'bg-evergreen text-white' : 'bg-card text-muted-foreground hover:bg-surface')}>
+                <List className="w-3.5 h-3.5" /> List
+              </button>
+            </div>
+            <button className="px-3 py-1.5 text-sm rounded-lg bg-evergreen text-white font-medium flex items-center gap-1.5 hover:bg-evergreen-mid transition-colors">
+              <Plus className="w-3.5 h-3.5" /> New deal
+            </button>
+          </div>
         }
       />
 
@@ -58,38 +70,33 @@ export default function Deals() {
         </div>
       ) : deals.length === 0 ? (
         <EmptyState icon={BarChart3} title="No deals yet" body="Open your first deal to see it here." />
+      ) : view === 'kanban' ? (
+        <DealKanban initialDeals={deals} />
       ) : (
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {byStage.map(({ stage, items }) => (
-            <div key={stage} className="w-60 shrink-0">
-              <div className="flex items-center justify-between mb-2 px-1">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{stage}</span>
-                <span className="text-xs bg-surface px-1.5 py-0.5 rounded font-mono text-muted-2">{items.length}</span>
-              </div>
-              <div className="space-y-2">
-                {items.length === 0 ? (
-                  <div className="h-14 rounded-xl border border-dashed border-hairline flex items-center justify-center text-xs text-muted-2">Empty</div>
-                ) : (
-                  items.map(deal => (
-                    <div key={deal.id} className={cn('bg-card border rounded-xl p-3 hover:shadow-sm transition-all cursor-pointer', deal.risk_flag ? 'border-terracotta/30' : 'border-hairline hover:border-hairline-strong')}>
-                      <div className="text-sm font-medium text-foreground truncate">{deal.deal_title || deal.unit_ref || 'Deal'}</div>
-                      {deal.deal_value && (
-                        <div className="text-xs font-mono text-muted-foreground mt-1">AED {Number(deal.deal_value).toLocaleString()}</div>
-                      )}
-                      {deal.risk_flag && (
-                        <div className="flex items-center gap-1 mt-1.5 text-xs text-terracotta">
-                          <AlertTriangle className="w-3 h-3" /> At risk
-                        </div>
-                      )}
-                      <div className="text-xs text-muted-2 mt-1.5 font-mono">
-                        {deal.days_in_stage ? `${deal.days_in_stage}d in stage` : ''}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          ))}
+        <div className="bg-card border border-hairline rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="border-b border-hairline bg-surface">
+              <tr>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">Deal</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">Value</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">Stage</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">Days</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-hairline">
+              {deals.map(deal => (
+                <tr key={deal.id} className="hover:bg-surface transition-colors">
+                  <td className="px-4 py-3">
+                    <div className="font-medium text-foreground">{deal.deal_title || deal.unit_ref || 'Deal'}</div>
+                    {deal.risk_flag && <div className="flex items-center gap-1 text-xs text-terracotta mt-0.5"><AlertTriangle className="w-3 h-3" /> At risk</div>}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{deal.deal_value ? `AED ${Number(deal.deal_value).toLocaleString()}` : '—'}</td>
+                  <td className="px-4 py-3"><span className="text-xs font-medium text-muted-foreground">{deal.stage || 'Offer'}</span></td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-2">{deal.days_in_stage || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

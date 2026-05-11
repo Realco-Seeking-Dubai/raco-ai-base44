@@ -6,6 +6,8 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import { Users, TrendingUp, Building2, Star, Clock, CheckCircle2, AlertTriangle, Zap, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import StatsSection from '@/components/home/StatsSection';
+import { getDeals } from '@/lib/supabase';
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -19,6 +21,7 @@ export default function Home() {
   const [suggestions, setSuggestions] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [activity, setActivity] = useState([]);
+  const [deals, setDeals] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,10 +30,12 @@ export default function Home() {
       getAiSuggestions(user.email),
       getAgentTasks(user.email),
       getActivityTimeline(user.email),
-    ]).then(([s, t, a]) => {
+      getDeals(),
+    ]).then(([s, t, a, d]) => {
       setSuggestions(s);
       setTasks(t);
       setActivity(a);
+      setDeals(d);
     }).catch(() => {}).finally(() => setLoading(false));
   }, [user]);
 
@@ -134,6 +139,9 @@ export default function Home() {
           )}
         </div>
       </div>
+
+      {/* Stats Section */}
+      <StatsSection tasks={tasks} activity={activity} deals={deals} loading={loading} />
 
       {/* Recent Activity */}
       {activity.length > 0 && (
