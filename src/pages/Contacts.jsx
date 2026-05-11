@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
-import { getNetworkContacts } from '@/lib/supabase';
+import { getPixxiListings, getPixxiUsers } from '@/lib/supabase';
 import PageHeader from '@/components/ui/PageHeader';
 import StatusBadge from '@/components/ui/StatusBadge';
 import EmptyState from '@/components/ui/EmptyState';
@@ -19,17 +19,35 @@ export default function Contacts() {
   const [showSidebar, setShowSidebar] = useState(true);
 
   useEffect(() => {
-    getNetworkContacts({ search })
-      .then(data => {
-        setContacts(data || []);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Contacts fetch error:', err);
-        setContacts([]);
-        setLoading(false);
+    Promise.all([
+      getPixxiListings(null, { filterByAgent: false }),
+      getPixxiUsers(),
+    ]).then(([listings, users]) => {
+      // Map listings + users to contacts (agents who have listings)
+      const agentMap = new Map();
+      listings.forEach(l => {
+        if (!agentMap.has(l.pixxi_user_email)) {
+          agentMap.set(l.pixxi_user_email, {
+            pixxi_email: l.pixxi_user_email,
+            full_name: l.agent_name || 'Unknown Agent',
+            primary_email: l.pixxi_user_email,
+            property_count: 0,
+            confidence_score: 0.8,
+          });
+        }
+        const contact = agentMap.get(l.pixxi_user_email);
+        contact.property_count = (contact.property_count || 0) + 1;
       });
-  }, [search]);
+      
+      const mapped = Array.from(agentMap.values());
+      setContacts(mapped);
+      setLoading(false);
+    }).catch(err => {
+      console.error('Contacts fetch error:', err);
+      setContacts([]);
+      setLoading(false);
+    });
+  }, []);
 
   const sorted = [...contacts].sort((a, b) => {
     switch (filters.sort?.value) {
@@ -43,18 +61,15 @@ export default function Contacts() {
   });
 
   const filtered = sorted.filter(c => {
-    if (filters.tag !== 'All') {
-      if (filters.tag === 'Client' && !c.is_client) return false;
-      if (filters.tag !== 'Client' && c.current_tag?.toLowerCase() !== filters.tag.toLowerCase()) return false;
-    }
-    // Zone — approximate match on known zones
-    if (filters.zone !== 'All' && c.zone && !c.zone.toLowerCase().includes(filters.zone.toLowerCase())) return false;
-    // Source
-    if (filters.source !== 'All' && c.lead_source?.toLowerCase() !== filters.source.toLowerCase()) return false;
-    // Budget
-    const budget = Number(c.budget_aed) || 0;
-    if (budget > 0 && filters.budget?.max !== Infinity && budget > filters.budget.max) return false;
-    if (budget > 0 && budget < filters.budget?.min) return false;
+    const matchSearch = !search || 
+      c.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+      c.primary_email?.toLowerCase().includes(search.toLowerCase());
+    if (!matchSearch) return false;
+    
+    // Basic filtering for agent contacts
+    if (filters.tag !== 'All' && filters.tag !== 'Client') return false;
+    if (filters.zone !== 'All') return false;
+    if (filters.source !== 'All') return false;
     return true;
   });
 
