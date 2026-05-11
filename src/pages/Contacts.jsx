@@ -20,9 +20,15 @@ export default function Contacts() {
 
   useEffect(() => {
     getNetworkContacts({ search })
-      .then(setContacts)
-      .catch(() => setContacts([]))
-      .finally(() => setLoading(false));
+      .then(data => {
+        setContacts(data || []);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Contacts fetch error:', err);
+        setContacts([]);
+        setLoading(false);
+      });
   }, [search]);
 
   const sorted = [...contacts].sort((a, b) => {

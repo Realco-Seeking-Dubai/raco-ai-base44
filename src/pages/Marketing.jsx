@@ -31,9 +31,15 @@ export default function Marketing() {
   useEffect(() => {
     if (!user?.email) return;
     getCampaigns(user.email)
-      .then(setCampaigns)
-      .catch(() => setCampaigns([]))
-      .finally(() => setLoading(false));
+      .then(data => {
+        setCampaigns(data || []);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Campaigns fetch error:', err);
+        setCampaigns([]);
+        setLoading(false);
+      });
   }, [user]);
 
   return (

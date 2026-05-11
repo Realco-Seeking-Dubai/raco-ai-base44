@@ -12,7 +12,10 @@ export async function getNetworkContacts({ search } = {}) {
   let q = agentDb.from('network_of_contacts').select('*').limit(100).order('last_contact_at', { ascending: false, nullsFirst: false });
   if (search) q = q.ilike('full_name', `%${search}%`);
   const { data, error } = await q;
-  if (error) throw error;
+  if (error) {
+    console.warn('Network contacts query error:', error);
+    return [];
+  }
   return data || [];
 }
 

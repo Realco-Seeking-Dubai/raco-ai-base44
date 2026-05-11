@@ -32,24 +32,27 @@ export default function Home() {
 
   useEffect(() => {
     if (!queryEmail) return;
+    setLoading(true);
     Promise.all([
       getAiSuggestions(queryEmail),
       getAgentTasks(queryEmail),
       getActivityTimeline(queryEmail),
       getDeals(),
-      agentDb.from('SuperAgent')
-        .select('agent_name,avatar_emoji,last_triggered_at')
-        .eq('is_active', true)
-        .order('last_triggered_at', { ascending: false })
-        .limit(5)
-        .then(({ data }) => data || []),
+      base44.entities.SuperAgent.list(),
     ]).then(([s, t, a, d, agents]) => {
       setSuggestions(s);
       setTasks(t);
       setActivity(a);
       setDeals(d);
-      setAgentActivity(agents);
-    }).catch(() => {}).finally(() => setLoading(false));
+      const active = (agents || []).filter(ag => ag.is_active).sort((x, y) => 
+        new Date(y.last_triggered_at || 0) - new Date(x.last_triggered_at || 0)
+      ).slice(0, 5);
+      setAgentActivity(active);
+      setLoading(false);
+    }).catch(err => {
+      console.error('Home data fetch error:', err);
+      setLoading(false);
+    });
   }, [queryEmail]);
 
   const firstName = lensUser?.full_name?.split(' ')[0] || user?.full_name?.split(' ')[0] || 'Agent';

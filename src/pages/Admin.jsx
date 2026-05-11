@@ -20,9 +20,15 @@ export default function Admin() {
   function loadUsers() {
     setLoading(true);
     getPixxiUsers()
-      .then(setUsers)
-      .catch(() => setUsers([]))
-      .finally(() => setLoading(false));
+      .then(data => {
+        setUsers(data || []);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Users fetch error:', err);
+        setUsers([]);
+        setLoading(false);
+      });
   }
 
   useEffect(() => { loadUsers(); }, []);

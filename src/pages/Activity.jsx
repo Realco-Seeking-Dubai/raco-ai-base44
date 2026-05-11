@@ -23,9 +23,13 @@ export default function ActivityPage() {
       getAgentTasks(user.email),
       getActivityTimeline(user.email),
     ]).then(([t, a]) => {
-      setTasks(t);
-      setTimeline(a);
-    }).catch(() => {}).finally(() => setLoading(false));
+      setTasks(t || []);
+      setTimeline(a || []);
+      setLoading(false);
+    }).catch(err => {
+      console.error('Activity data error:', err);
+      setLoading(false);
+    });
   }, [user]);
 
   async function completeTask(taskId) {

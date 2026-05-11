@@ -16,9 +16,15 @@ export default function Compliance() {
 
   useEffect(() => {
     getAuditLog()
-      .then(setLog)
-      .catch(() => setLog([]))
-      .finally(() => setLoading(false));
+      .then(data => {
+        setLog(data || []);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Audit log error:', err);
+        setLog([]);
+        setLoading(false);
+      });
   }, []);
 
   const filtered = vetoesOnly ? log.filter(e => e.status === 'vetoed') : log;

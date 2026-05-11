@@ -16,7 +16,16 @@ export default function Deals() {
   const [view, setView] = useState('kanban');
 
   useEffect(() => {
-    getDeals().then(setDeals).catch(() => setDeals([])).finally(() => setLoading(false));
+    getDeals()
+      .then(data => {
+        setDeals(data || []);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Deals fetch error:', err);
+        setDeals([]);
+        setLoading(false);
+      });
   }, []);
 
   const total = deals.reduce((s, d) => s + (Number(d.deal_value) || 0), 0);

@@ -58,8 +58,13 @@ export default function Leads() {
       scored.sort((a, b) => b._score - a._score);
       setLeads(scored);
       setListings(listingsData);
-      setAgents(agentsData.filter(a => a.lifecycle_status === 'active' || a.is_active));
-    }).catch(() => {}).finally(() => setLoading(false));
+      const activeAgents = (agentsData || []).filter(a => a.lifecycle_status === 'active' || a.is_active);
+      setAgents(activeAgents);
+      setLoading(false);
+    }).catch(err => {
+      console.error('Leads data error:', err);
+      setLoading(false);
+    });
   }
 
   useEffect(() => { loadData(); }, [lensEmail]);

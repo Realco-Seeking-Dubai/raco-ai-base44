@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { agentDb } from '@/lib/supabase';
 import PageHeader from '@/components/ui/PageHeader';
 import PropertyMap from '@/components/map/PropertyMap';
 import { MapPin, ChevronRight, Building2, Map } from 'lucide-react';
@@ -13,6 +14,21 @@ const COLORS = {
 
 export default function Zones() {
   const [selected, setSelected] = useState(null);
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      agentDb.from('raco_projects').select('*').limit(50),
+      agentDb.from('raco_project_intelligence').select('*').limit(50),
+    ]).then(([{ data: projData }, { data: intellData }]) => {
+      setProjects(projData || []);
+      setLoading(false);
+    }).catch(err => {
+      console.error('Zones data error:', err);
+      setLoading(false);
+    });
+  }, []);
 
   return (
     <div className="p-6 animate-fade-in">

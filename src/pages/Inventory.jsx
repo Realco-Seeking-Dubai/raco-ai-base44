@@ -35,9 +35,15 @@ export default function Inventory() {
     if (tab !== 'My Areas' || !queryEmail) { setLoading(false); return; }
     setLoading(true);
     getOwnerStatus(queryEmail)
-      .then(data => setOwners(data))
-      .catch(() => setOwners([]))
-      .finally(() => setLoading(false));
+      .then(data => {
+        setOwners(data || []);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Owner status error:', err);
+        setOwners([]);
+        setLoading(false);
+      });
   }, [tab, user, lensEmail]);
 
   const filteredOwners = owners.filter(o => {

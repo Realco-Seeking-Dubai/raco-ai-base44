@@ -19,10 +19,14 @@ export default function Dashboard() {
       getActivityTimeline('').catch(() => []),
       getAuditLog().catch(() => []),
     ]).then(([u, a, al]) => {
-      setUsers(u);
-      setActivities(a);
-      setAuditLog(al);
-    }).catch(() => {}).finally(() => setLoading(false));
+      setUsers(u || []);
+      setActivities(a || []);
+      setAuditLog(al || []);
+      setLoading(false);
+    }).catch(err => {
+      console.error('Dashboard data error:', err);
+      setLoading(false);
+    });
   }, []);
 
   // User activity by role

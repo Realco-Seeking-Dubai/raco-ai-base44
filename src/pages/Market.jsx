@@ -15,9 +15,15 @@ export default function Market() {
 
   useEffect(() => {
     getMarketSummary()
-      .then(setSummary)
-      .catch(() => setSummary([]))
-      .finally(() => setLoading(false));
+      .then(data => {
+        setSummary(data || []);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Market data error:', err);
+        setSummary([]);
+        setLoading(false);
+      });
   }, []);
 
   return (

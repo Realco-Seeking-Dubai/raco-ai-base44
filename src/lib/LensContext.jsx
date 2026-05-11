@@ -11,17 +11,23 @@ export function LensProvider({ children }) {
     supabase
       .from('pixxi_users')
       .select('id, full_name, pixxi_email, primary_email, lifecycle_status, role')
+      .eq('lifecycle_status', 'active')
       .order('full_name', { ascending: true })
-      .then(({ data }) => {
-        const users = data || [];
-        setPixxiUsers(users);
-        // Default lens to Irfan
-        const irfan = users.find(u =>
-          u.full_name?.toLowerCase().includes('irfan') ||
-          u.pixxi_email?.toLowerCase().includes('irfan') ||
-          u.primary_email?.toLowerCase().includes('irfan')
-        );
-        if (irfan) setLensUser(irfan);
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn('Lens: pixxi_users fetch error', error);
+          setPixxiUsers([]);
+        } else {
+          const users = data || [];
+          setPixxiUsers(users);
+          // Default lens to Irfan if found
+          const irfan = users.find(u =>
+            u.full_name?.toLowerCase().includes('irfan') ||
+            u.pixxi_email?.toLowerCase().includes('irfan') ||
+            u.primary_email?.toLowerCase().includes('irfan')
+          );
+          if (irfan) setLensUser(irfan);
+        }
       });
   }, []);
 
