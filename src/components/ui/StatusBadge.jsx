@@ -28,6 +28,9 @@ const configs = {
   inactive: { label: 'Inactive', className: 'bg-surface-2 text-muted-foreground' },
   staged: { label: 'Staged', className: 'bg-brass-tint text-brass' },
   pending_email: { label: 'Pending Email', className: 'bg-sky-tint text-sky' },
+  on_hold: { label: 'On Hold', className: 'bg-brass-tint text-brass' },
+  left_company: { label: 'Left Company', className: 'bg-terracotta-tint text-terracotta' },
+  do_not_activate: { label: 'Do Not Activate', className: 'bg-terracotta/20 text-terracotta font-semibold' },
   // Generic
   draft: { label: 'Draft', className: 'bg-surface-2 text-muted-foreground' },
   sent: { label: 'Sent', className: 'bg-sky-tint text-sky' },

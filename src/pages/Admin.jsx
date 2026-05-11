@@ -3,7 +3,8 @@ import { getPixxiUsers } from '@/lib/supabase';
 import PageHeader from '@/components/ui/PageHeader';
 import StatusBadge from '@/components/ui/StatusBadge';
 import EmptyState from '@/components/ui/EmptyState';
-import { Settings, Users, Search } from 'lucide-react';
+import UserLifecycleActions from '@/components/admin/UserLifecycleActions.jsx';
+import { Users, Search, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const TABS = ['Users', 'Scope Map'];
@@ -14,12 +15,22 @@ export default function Admin() {
   const [tab, setTab] = useState('Users');
   const [search, setSearch] = useState('');
 
-  useEffect(() => {
+  function loadUsers() {
+    setLoading(true);
     getPixxiUsers()
       .then(setUsers)
       .catch(() => setUsers([]))
       .finally(() => setLoading(false));
-  }, []);
+  }
+
+  useEffect(() => { loadUsers(); }, []);
+
+  // Optimistic update — reflects change instantly without a refetch
+  function handleUserUpdated(userId, newStatus) {
+    setUsers(prev => prev.map(u =>
+      u.id === userId ? { ...u, lifecycle_status: newStatus, is_active: newStatus === 'active' } : u
+    ));
+  }
 
   const filtered = users.filter(u =>
     !search || u.full_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase())
@@ -31,8 +42,8 @@ export default function Admin() {
         title="Users & Admin"
         subtitle="Manage team members and scope assignments"
         actions={
-          <button className="px-3 py-1.5 text-sm rounded-lg bg-evergreen text-white font-medium flex items-center gap-1.5 hover:bg-evergreen-mid transition-colors">
-            <Users className="w-3.5 h-3.5" /> Activate user
+          <button onClick={loadUsers} className="px-3 py-1.5 text-sm rounded-lg border border-hairline bg-card font-medium flex items-center gap-1.5 hover:bg-surface transition-colors text-muted-foreground">
+            <RefreshCw className="w-3.5 h-3.5" /> Refresh
           </button>
         }
       />
@@ -79,7 +90,8 @@ export default function Admin() {
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">User</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">Role</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</th>
-                    <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">Actions</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">Active</th>
+                    <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">Lifecycle Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-hairline">
@@ -97,13 +109,15 @@ export default function Admin() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-muted-foreground text-xs">{u.role || 'user'}</td>
-                      <td className="px-4 py-3"><StatusBadge status={u.lifecycle_status || 'inactive'} /></td>
-                      <td className="px-4 py-3 text-right">
-                        {(u.lifecycle_status === 'staged' || u.lifecycle_status === 'inactive') && (
-                          <button className="text-xs px-2.5 py-1 rounded-lg border border-evergreen text-evergreen hover:bg-evergreen-tint transition-colors font-medium">
-                            Activate
-                          </button>
-                        )}
+                      <td className="px-4 py-3"><StatusBadge status={u.lifecycle_status || 'staged'} /></td>
+                      <td className="px-4 py-3">
+                        <span className={cn('inline-flex items-center gap-1 text-xs font-medium', u.is_active ? 'text-evergreen' : 'text-muted-2')}>
+                          <span className={cn('w-1.5 h-1.5 rounded-full', u.is_active ? 'bg-evergreen' : 'bg-muted-2')} />
+                          {u.is_active ? 'Yes' : 'No'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <UserLifecycleActions user={u} onUpdated={handleUserUpdated} />
                       </td>
                     </tr>
                   ))}
