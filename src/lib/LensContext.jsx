@@ -13,7 +13,15 @@ export function LensProvider({ children }) {
       .select('id, full_name, pixxi_email, primary_email, lifecycle_status, role')
       .order('full_name', { ascending: true })
       .then(({ data }) => {
-        setPixxiUsers(data || []);
+        const users = data || [];
+        setPixxiUsers(users);
+        // Default lens to Irfan
+        const irfan = users.find(u =>
+          u.full_name?.toLowerCase().includes('irfan') ||
+          u.pixxi_email?.toLowerCase().includes('irfan') ||
+          u.primary_email?.toLowerCase().includes('irfan')
+        );
+        if (irfan) setLensUser(irfan);
       });
   }, []);
 

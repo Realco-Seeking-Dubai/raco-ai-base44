@@ -8,6 +8,7 @@ import { Users, TrendingUp, Building2, Star, Clock, CheckCircle2, AlertTriangle,
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import StatsSection from '@/components/home/StatsSection';
+import IrfanDataSections from '@/components/home/IrfanDataSections';
 import { getDeals } from '@/lib/supabase';
 
 function getGreeting() {
@@ -143,6 +144,9 @@ export default function Home() {
           )}
         </div>
       </div>
+
+      {/* Irfan's CRM Contacts, Pixxi Listings & Portal Leads */}
+      <IrfanDataSections lensEmail={queryEmail} />
 
       {/* Stats Section */}
       <StatsSection tasks={tasks} activity={activity} deals={deals} loading={loading} />

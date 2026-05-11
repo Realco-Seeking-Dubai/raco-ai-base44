@@ -116,6 +116,31 @@ export async function updatePixxiUserLifecycle(userId, lifecycle_status) {
   if (error) throw error;
 }
 
+// ─── Pixxi Listings ──────────────────────────────────────────────────────
+
+export async function getPixxiListings(userEmail) {
+  let q = supabase.from('pixxi_listings').select('*').limit(100).order('created_at', { ascending: false });
+  if (userEmail) q = q.eq('pixxi_user_email', userEmail);
+  const { data, error } = await q;
+  if (error) return [];
+  return data || [];
+}
+
+// ─── Portal Leads (Bayut / Dubizzle) ─────────────────────────────────────
+
+export async function getPortalLeads(userEmail) {
+  let q = supabase
+    .from('pixxi_leads')
+    .select('*')
+    .in('source', ['bayut', 'dubizzle', 'Bayut', 'Dubizzle'])
+    .limit(200)
+    .order('created_at', { ascending: false });
+  if (userEmail) q = q.eq('pixxi_user_email', userEmail);
+  const { data, error } = await q;
+  if (error) return [];
+  return data || [];
+}
+
 // ─── Campaigns ───────────────────────────────────────────────────────────
 
 export async function getCampaigns(userEmail) {
