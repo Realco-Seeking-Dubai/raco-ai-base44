@@ -1,38 +1,40 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClient } from 'npm:@supabase/supabase-js@2';
+
+const SUPABASE_URL = 'https://chuyaqczfjkbzxwvhsnm.supabase.co';
+const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 Deno.serve(async (req) => {
   try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user || user.role !== 'admin') {
-      return Response.json({ error: 'Admin required' }, { status: 403 });
-    }
-
-    // Get pixxi_users columns
-    const { data: users } = await base44.supabase
-      .from('pixxi_users')
-      .select('*')
-      .limit(1);
-
-    // Get pixxi_listings columns
-    const { data: listings } = await base44.supabase
-      .from('pixxi_listings')
-      .select('*')
-      .limit(1);
-
-    // Get pixxi_leads columns
-    const { data: leads } = await base44.supabase
-      .from('pixxi_leads')
-      .select('*')
-      .limit(1);
+    // Get counts and sample data for all three tables
+    const [usersRes, listingsRes, leadsRes] = await Promise.all([
+      supabase.from('pixxi_users').select('*', { count: 'exact' }).limit(3),
+      supabase.from('pixxi_listings').select('*', { count: 'exact' }).limit(3),
+      supabase.from('pixxi_leads').select('*', { count: 'exact' }).limit(3),
+    ]);
 
     return Response.json({
-      pixxi_users_columns: users?.length > 0 ? Object.keys(users[0]) : [],
-      pixxi_listings_columns: listings?.length > 0 ? Object.keys(listings[0]) : [],
-      pixxi_leads_columns: leads?.length > 0 ? Object.keys(leads[0]) : [],
-      sample_user: users?.[0] || null,
-      sample_listing: listings?.[0] || null,
-      sample_lead: leads?.[0] || null,
+      pixxi_users: {
+        total_count: usersRes.count || 0,
+        columns: usersRes.data?.length > 0 ? Object.keys(usersRes.data[0]) : [],
+        samples: usersRes.data || [],
+      },
+      pixxi_listings: {
+        total_count: listingsRes.count || 0,
+        columns: listingsRes.data?.length > 0 ? Object.keys(listingsRes.data[0]) : [],
+        samples: listingsRes.data || [],
+      },
+      pixxi_leads: {
+        total_count: leadsRes.count || 0,
+        columns: leadsRes.data?.length > 0 ? Object.keys(leadsRes.data[0]) : [],
+        samples: leadsRes.data || [],
+      },
+      errors: {
+        users: usersRes.error?.message || null,
+        listings: listingsRes.error?.message || null,
+        leads: leadsRes.error?.message || null,
+      },
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

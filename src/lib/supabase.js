@@ -125,7 +125,7 @@ export async function updatePixxiUserLifecycle(userId, lifecycle_status) {
 export async function getPixxiListings(userEmail, { filterByAgent = true } = {}) {
   let q = supabase
     .from('pixxi_listings')
-    .select('id,title,zone,property_type,bedrooms,bathrooms,asking_price,status,pixxi_user_email,created_at')
+    .select('id,pixxi_id,title,property_type,bedrooms,bathrooms,price,status,pixxi_user_email,region,community,agent_name,created_at')
     .limit(200)
     .order('created_at', { ascending: false });
   if (userEmail && filterByAgent) q = q.eq('pixxi_user_email', userEmail);

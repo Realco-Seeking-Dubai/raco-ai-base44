@@ -27,20 +27,20 @@ async function syncUsers() {
   const users = Array.isArray(data) ? data : (data.users || data.data || []);
 
   const rows = users.map(u => ({
-    id: u.id || u.userId || u.user_id,
-    full_name: u.name || u.full_name || `${u.firstName || ''} ${u.lastName || ''}`.trim(),
-    email: u.email,
-    pixxi_email: u.email,
-    role: u.role || 'agent',
-    lifecycle_status: u.status || u.lifecycle_status || 'active',
-    is_active: u.isActive ?? u.is_active ?? true,
-  })).filter(u => u.id && u.email);
+    pixxi_id: u.id,
+    pixxi_user_email: u.email,
+    name: u.name,
+    phone: u.phone || null,
+    avatar_url: u.avatar || null,
+    raw: u,
+    synced_at: new Date().toISOString(),
+  })).filter(u => u.pixxi_id && u.pixxi_user_email);
 
   if (rows.length === 0) return { synced: 0 };
 
   const { error } = await supabase
     .from('pixxi_users')
-    .upsert(rows, { onConflict: 'id' });
+    .upsert(rows, { onConflict: 'pixxi_id' });
 
   if (error) throw new Error(`Supabase upsert users error: ${error.message}`);
   return { synced: rows.length };
