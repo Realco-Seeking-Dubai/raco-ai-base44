@@ -51,7 +51,7 @@ export default function Home() {
     <div className="p-6 max-w-5xl mx-auto animate-fade-in">
       {/* Hero */}
       <div className="mb-8 p-6 rounded-2xl bg-gradient-to-r from-evergreen to-evergreen-mid text-white relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 80% 50%, hsl(var(--brass)) 0%, transparent 60%)' }} />
+        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 80% 50%, hsl(0 0% 50%) 0%, transparent 60%)' }} />
         <div className="relative z-10">
           <div className="text-xs font-medium text-white/60 uppercase tracking-wider mb-1">{today}</div>
           <h1 className="text-2xl font-semibold">{getGreeting()}, {firstName}</h1>
