@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getLeads } from '@/lib/supabase';
+import { useLens } from '@/lib/LensContext';
 import PageHeader from '@/components/ui/PageHeader';
 import StatusBadge from '@/components/ui/StatusBadge';
 import EmptyState from '@/components/ui/EmptyState';
@@ -28,6 +29,7 @@ const STAGE_STYLES = {
 const SCORE_FILTERS = ['All', 'Hot', 'Warm', 'Cold'];
 
 export default function Leads() {
+  const { lensEmail } = useLens();
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState('kanban');
@@ -35,7 +37,7 @@ export default function Leads() {
   const [scoreFilter, setScoreFilter] = useState('All');
 
   useEffect(() => {
-    getLeads()
+    getLeads(lensEmail)
       .then(data => {
         // Attach computed score to each lead
         const scored = data.map(l => ({ ...l, _score: computeLeadScore(l) }));
@@ -45,7 +47,7 @@ export default function Leads() {
       })
       .catch(() => setLeads([]))
       .finally(() => setLoading(false));
-  }, []);
+  }, [lensEmail]);
 
   const filtered = leads.filter(l => {
     const matchSearch = !search ||

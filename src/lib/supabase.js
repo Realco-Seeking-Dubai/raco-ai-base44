@@ -17,8 +17,10 @@ export async function getNetworkContacts({ search } = {}) {
 
 // ─── Leads ────────────────────────────────────────────────────────────────
 
-export async function getLeads() {
-  const { data, error } = await supabase.from('pixxi_leads').select('*').limit(200).order('created_at', { ascending: false });
+export async function getLeads(lensEmail) {
+  let q = supabase.from('pixxi_leads').select('*').limit(200).order('created_at', { ascending: false });
+  if (lensEmail) q = q.eq('pixxi_user_email', lensEmail);
+  const { data, error } = await q;
   if (error) return [];
   return data || [];
 }

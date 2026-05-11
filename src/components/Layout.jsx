@@ -1,7 +1,9 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import RacoFloatingBot from '@/components/RacoFloatingBot';
+import ViewAsSelector from '@/components/ViewAsSelector';
 import { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
+import { useLens } from '@/lib/LensContext';
 import { base44 } from '@/api/base44Client';
 import {
   Home, MessageSquare, Activity, Users, TrendingUp, Building2,
@@ -71,6 +73,7 @@ function NavItem({ item, collapsed }) {
 
 export default function Layout() {
   const { user } = useAuth();
+  const { lensUser, setLensUser } = useLens();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -188,6 +191,7 @@ export default function Layout() {
             <Menu className="w-5 h-5" />
           </button>
           <div className="flex-1" />
+          <ViewAsSelector />
           <button className="w-8 h-8 rounded-md hover:bg-surface flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
             <Bell className="w-4 h-4" />
           </button>
@@ -202,6 +206,18 @@ export default function Layout() {
             </span>
           </div>
         </header>
+
+        {/* Lens banner */}
+        {lensUser && (
+          <div className="shrink-0 px-4 py-2 bg-brass-tint border-b border-brass/30 flex items-center justify-between">
+            <span className="text-xs font-medium text-brass">
+              👁 Viewing data as <strong>{lensUser.full_name}</strong> — {lensUser.pixxi_email || lensUser.primary_email}
+            </span>
+            <button onClick={() => setLensUser(null)} className="text-xs text-brass hover:text-brass-light font-medium underline">
+              Exit
+            </button>
+          </div>
+        )}
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto">

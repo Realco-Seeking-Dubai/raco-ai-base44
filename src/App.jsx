@@ -6,6 +6,7 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import Layout from '@/components/Layout';
+import { LensProvider } from '@/lib/LensContext';
 
 // Pages
 import Home from '@/pages/Home';
@@ -66,7 +67,9 @@ function App() {
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
         <Router>
-          <AuthenticatedApp />
+          <LensProvider>
+            <AuthenticatedApp />
+          </LensProvider>
         </Router>
         <Toaster />
       </QueryClientProvider>

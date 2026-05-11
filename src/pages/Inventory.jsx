@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
+import { useLens } from '@/lib/LensContext';
 import { getOwnerStatus, getOwners } from '@/lib/supabase';
 import PageHeader from '@/components/ui/PageHeader';
 import StatusBadge from '@/components/ui/StatusBadge';
@@ -21,6 +22,7 @@ const DEFAULT_FILTERS = {
 
 export default function Inventory() {
   const { user } = useAuth();
+  const { lensEmail } = useLens();
   const [tab, setTab] = useState('My Areas');
   const [owners, setOwners] = useState([]);
   const [search, setSearch] = useState('');
@@ -29,13 +31,14 @@ export default function Inventory() {
   const [showSidebar, setShowSidebar] = useState(true);
 
   useEffect(() => {
-    if (tab !== 'My Areas' || !user?.email) { setLoading(false); return; }
+    const queryEmail = lensEmail || user?.email;
+    if (tab !== 'My Areas' || !queryEmail) { setLoading(false); return; }
     setLoading(true);
-    getOwnerStatus(user.email)
+    getOwnerStatus(queryEmail)
       .then(data => setOwners(data))
       .catch(() => setOwners([]))
       .finally(() => setLoading(false));
-  }, [tab, user]);
+  }, [tab, user, lensEmail]);
 
   const filteredOwners = owners.filter(o => {
     const name = o.raco_owners?.full_name || '';

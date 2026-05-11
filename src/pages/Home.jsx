@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
+import { useLens } from '@/lib/LensContext';
 import { getAiSuggestions, getAgentTasks, getActivityTimeline } from '@/lib/supabase';
 import KpiCard from '@/components/ui/KpiCard';
 import StatusBadge from '@/components/ui/StatusBadge';
@@ -18,18 +19,21 @@ function getGreeting() {
 
 export default function Home() {
   const { user } = useAuth();
+  const { lensUser, lensEmail } = useLens();
   const [suggestions, setSuggestions] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [activity, setActivity] = useState([]);
   const [deals, setDeals] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const queryEmail = lensEmail || user?.email;
+
   useEffect(() => {
-    if (!user?.email) return;
+    if (!queryEmail) return;
     Promise.all([
-      getAiSuggestions(user.email),
-      getAgentTasks(user.email),
-      getActivityTimeline(user.email),
+      getAiSuggestions(queryEmail),
+      getAgentTasks(queryEmail),
+      getActivityTimeline(queryEmail),
       getDeals(),
     ]).then(([s, t, a, d]) => {
       setSuggestions(s);
@@ -37,9 +41,9 @@ export default function Home() {
       setActivity(a);
       setDeals(d);
     }).catch(() => {}).finally(() => setLoading(false));
-  }, [user]);
+  }, [queryEmail]);
 
-  const firstName = user?.full_name?.split(' ')[0] || 'Agent';
+  const firstName = lensUser?.full_name?.split(' ')[0] || user?.full_name?.split(' ')[0] || 'Agent';
   const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
