@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 
-export default function KpiCard({ label, value, sub, icon: Icon, color = 'evergreen', onClick }) {
+export default function KpiCard({ label, value, sub, icon: Icon, color = 'evergreen', onClick, className }) {
   const colors = {
     evergreen: 'bg-evergreen-tint text-evergreen',
     brass: 'bg-brass-tint text-brass',
@@ -13,7 +13,8 @@ export default function KpiCard({ label, value, sub, icon: Icon, color = 'evergr
       onClick={onClick}
       className={cn(
         'flex flex-col gap-3 p-4 rounded-xl border border-hairline bg-card text-left w-full transition-all',
-        onClick ? 'hover:border-hairline-strong hover:shadow-sm cursor-pointer' : 'cursor-default'
+        onClick ? 'hover:border-hairline-strong hover:shadow-sm cursor-pointer' : 'cursor-default',
+        className
       )}
     >
       {Icon && (
