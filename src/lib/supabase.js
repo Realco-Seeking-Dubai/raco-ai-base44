@@ -123,10 +123,17 @@ export async function updatePixxiUserLifecycle(userId, lifecycle_status) {
 // ─── Pixxi Listings ──────────────────────────────────────────────────────
 
 export async function getPixxiListings(userEmail, { filterByAgent = true } = {}) {
-  let q = supabase.from('pixxi_listings').select('*').limit(200).order('created_at', { ascending: false });
+  let q = supabase
+    .from('pixxi_listings')
+    .select('id,title,zone,property_type,bedrooms,bathrooms,asking_price,status,pixxi_user_email,created_at')
+    .limit(200)
+    .order('created_at', { ascending: false });
   if (userEmail && filterByAgent) q = q.eq('pixxi_user_email', userEmail);
   const { data, error } = await q;
-  if (error) return [];
+  if (error) {
+    console.warn('pixxi_listings query error:', error);
+    return [];
+  }
   return data || [];
 }
 
