@@ -1,10 +1,10 @@
-import { X } from 'lucide-react';
+import { X, Edit2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { cn } from '@/lib/utils';
 
-export default function AgentDetailModal({ agent, onClose, onUpdate }) {
+export default function AgentDetailModal({ agent, onClose, onUpdate, onEdit, onDelete }) {
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
@@ -18,9 +18,29 @@ export default function AgentDetailModal({ agent, onClose, onUpdate }) {
               <p className="text-xs text-muted-foreground">{agent.role}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-surface text-muted-foreground hover:text-foreground transition-colors">
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            {onEdit && (
+              <button
+                onClick={onEdit}
+                className="p-1.5 rounded-lg hover:bg-brass-tint text-muted-foreground hover:text-brass transition-colors"
+                title="Edit agent"
+              >
+                <Edit2 className="w-4 h-4" />
+              </button>
+            )}
+            {onDelete && (
+              <button
+                onClick={onDelete}
+                className="p-1.5 rounded-lg hover:bg-terracotta-tint text-muted-foreground hover:text-terracotta transition-colors"
+                title="Delete agent"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-surface text-muted-foreground hover:text-foreground transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         <div className="p-6 space-y-6">
