@@ -5,7 +5,9 @@ import PageHeader from '@/components/ui/PageHeader';
 import StatusBadge from '@/components/ui/StatusBadge';
 import EmptyState from '@/components/ui/EmptyState';
 import InventorySidebar, { BUDGET_RANGES } from '@/components/inventory/InventorySidebar';
-import { Building2, Search, Plus, StickyNote, Send, CheckSquare, SlidersHorizontal } from 'lucide-react';
+import ValuationTool from '@/components/inventory/ValuationTool';
+import PropertyMap from '@/components/map/PropertyMap';
+import { Building2, Search, Plus, StickyNote, Send, CheckSquare, SlidersHorizontal, Map } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const TABS = ['Listings', 'My Areas', 'Pocket Inventory'];
@@ -126,6 +128,26 @@ export default function Inventory() {
               />
             </div>
 
+            {/* Owner map */}
+            {!loading && filteredOwners.length > 0 && (
+              <div className="mb-5">
+                <div className="flex items-center gap-2 mb-2">
+                  <Map className="w-4 h-4 text-evergreen" />
+                  <span className="text-xs font-semibold text-foreground">Owner Locations</span>
+                </div>
+                <PropertyMap
+                  height={260}
+                  markers={filteredOwners.slice(0, 30).map(o => ({
+                    id: o.id,
+                    zone: o.zone || 'Al Furjan',
+                    label: o.raco_owners?.full_name || 'Owner',
+                    type: o.status === 'listed' ? 'listing' : o.status === 'responded' ? 'warm' : 'owner',
+                    sub: o.status,
+                  }))}
+                />
+              </div>
+            )}
+
             {loading ? (
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {[1,2,3,4,5,6].map(i => <div key={i} className="h-36 bg-surface rounded-xl animate-pulse" />)}
@@ -178,7 +200,25 @@ export default function Inventory() {
       )}
 
       {tab === 'Listings' && (
-        <EmptyState icon={Building2} title="Listings syncing" body="Your Pixxi listings will appear here once sync is complete." />
+        <div className="space-y-6">
+          <ValuationTool />
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <Map className="w-4 h-4 text-evergreen" />
+              <span className="text-sm font-semibold text-foreground">Listing Density Map</span>
+            </div>
+            <PropertyMap
+              height={420}
+              markers={[
+                { id: 'l1', zone: 'Al Furjan', label: 'Al Furjan Listing', type: 'listing', sub: '2BR · AED 1.4M' },
+                { id: 'l2', zone: 'JVC', label: 'JVC Tower', type: 'listing', sub: '1BR · AED 820K' },
+                { id: 'l3', zone: 'Dubai Hills', label: 'Dubai Hills Villa', type: 'listing', sub: '4BR · AED 6.2M' },
+                { id: 'l4', zone: 'Business Bay', label: 'Business Bay Apt', type: 'listing', sub: '2BR · AED 2.1M' },
+                { id: 'l5', zone: 'Downtown', label: 'Downtown Studio', type: 'listing', sub: 'Studio · AED 1.1M' },
+              ]}
+            />
+          </div>
+        </div>
       )}
 
       {tab === 'Pocket Inventory' && (

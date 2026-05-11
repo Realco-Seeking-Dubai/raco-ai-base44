@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { X, Phone, MessageCircle, Mail, FileText, Clock, Building2, Star, Send, StickyNote } from 'lucide-react';
+import { X, Phone, MessageCircle, Mail, Send, StickyNote } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import StatusBadge from '@/components/ui/StatusBadge';
+import MeetingLogger from '@/components/contacts/MeetingLogger';
 import { cn } from '@/lib/utils';
 
 const TABS = ['Overview', 'History', 'Deals'];
@@ -118,17 +119,17 @@ export default function ContactModal({ contact, onClose }) {
                 ))}
               </div>
 
-              {/* Log Note */}
+              {/* Quick note */}
               <div className="mt-4">
                 <div className="flex items-center gap-2 mb-2">
                   <StickyNote className="w-4 h-4 text-brass" />
-                  <span className="text-sm font-medium text-foreground">Log a Note</span>
+                  <span className="text-sm font-medium text-foreground">Quick Note</span>
                 </div>
                 <div className="flex gap-2">
                   <textarea
                     value={note}
                     onChange={e => setNote(e.target.value)}
-                    placeholder="Add a note about this contact…"
+                    placeholder="Add a quick note…"
                     rows={2}
                     className="flex-1 px-3 py-2 text-sm rounded-lg border border-hairline bg-card focus:outline-none focus:border-evergreen transition-colors resize-none"
                   />
@@ -137,6 +138,17 @@ export default function ContactModal({ contact, onClose }) {
                     <Send className="w-4 h-4" />
                   </button>
                 </div>
+              </div>
+
+              {/* Meeting Logger */}
+              <div className="mt-3">
+                <MeetingLogger
+                  contact={contact}
+                  onLogged={(entry, statusChange) => {
+                    setHistory(h => [entry, ...h]);
+                    if (statusChange) setTab('History');
+                  }}
+                />
               </div>
             </div>
           )}
