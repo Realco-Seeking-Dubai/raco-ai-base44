@@ -1,4 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import RacoFloatingBot from '@/components/RacoFloatingBot';
 import { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { base44 } from '@/api/base44Client';
@@ -207,6 +208,9 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Raco AI floating bot — draggable, visible on all pages */}
+      <RacoFloatingBot />
     </div>
   );
 }
