@@ -3,7 +3,7 @@ import { getPixxiUsers } from '@/lib/supabase';
 import PageHeader from '@/components/ui/PageHeader';
 import StatusBadge from '@/components/ui/StatusBadge';
 import EmptyState from '@/components/ui/EmptyState';
-import UserLifecycleActions from '@/components/admin/UserLifecycleActions.jsx';
+import UserLifecycleActions from '@/components/admin/UserLifecycleActions';
 import { Users, Search, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 

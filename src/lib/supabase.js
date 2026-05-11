@@ -101,10 +101,19 @@ export async function getMarketSummary() {
 export async function getPixxiUsers() {
   const { data, error } = await supabase
     .from('pixxi_users')
-    .select('id,full_name,email,role,lifecycle_status')
+    .select('id,full_name,email,role,lifecycle_status,is_active')
     .order('full_name', { ascending: true });
   if (error) return [];
   return data || [];
+}
+
+export async function updatePixxiUserLifecycle(userId, lifecycle_status) {
+  const is_active = lifecycle_status === 'active';
+  const { error } = await supabase
+    .from('pixxi_users')
+    .update({ lifecycle_status, is_active })
+    .eq('id', userId);
+  if (error) throw error;
 }
 
 // ─── Campaigns ───────────────────────────────────────────────────────────
