@@ -17,7 +17,7 @@ const NAV = [
   {
     group: 'Today',
     items: [
-      { label: 'Home', path: '/', icon: Home },
+      { label: 'Dashboard', path: '/', icon: Home },
       { label: 'Ask Raco', path: '/ask', icon: MessageSquare },
       { label: 'Activity', path: '/activity', icon: Activity },
     ],

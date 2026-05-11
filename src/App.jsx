@@ -22,6 +22,7 @@ import Marketing from '@/pages/Marketing';
 import Compliance from '@/pages/Compliance';
 import Admin from '@/pages/Admin';
 import Agents from '@/pages/Agents';
+import Dashboard from '@/pages/Dashboard';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -45,7 +46,8 @@ const AuthenticatedApp = () => {
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/home" element={<Home />} />
         <Route path="/ask" element={<AskRaco />} />
         <Route path="/activity" element={<Activity />} />
         <Route path="/contacts" element={<Contacts />} />
