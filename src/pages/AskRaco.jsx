@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { base44 } from '@/api/base44Client';
-import { Send, Zap, BarChart3, Users, MapPin, Building2, TrendingUp } from 'lucide-react';
+import { Send } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import RacoAvatar from '@/components/ask/RacoAvatar';
 
 const CHIPS = [
   'Who are my hottest leads this week?',
@@ -17,11 +18,7 @@ function MessageBubble({ msg }) {
   const isUser = msg.role === 'user';
   return (
     <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-      {!isUser && (
-        <div className="w-7 h-7 rounded-md bg-evergreen flex items-center justify-center shrink-0 mt-0.5">
-          <Zap className="w-3.5 h-3.5 text-white" />
-        </div>
-      )}
+      {!isUser && <RacoAvatar state="idle" size="sm" />}
       <div className={`max-w-[80%] rounded-xl px-4 py-3 text-sm ${isUser ? 'bg-evergreen text-white' : 'bg-card border border-hairline text-foreground'}`}>
         {isUser ? (
           <p>{msg.content}</p>
@@ -85,13 +82,11 @@ export default function AskRaco() {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="shrink-0 px-6 py-4 border-b border-hairline">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-md bg-evergreen flex items-center justify-center">
-            <Zap className="w-3.5 h-3.5 text-white" />
-          </div>
+        <div className="flex items-center gap-3">
+          <RacoAvatar state={loading ? 'thinking' : 'idle'} size="sm" />
           <div>
-            <h1 className="text-sm font-semibold text-foreground">Ask Raco</h1>
-            <p className="text-xs text-muted-foreground">Your intelligence assistant</p>
+            <h1 className="text-sm font-semibold text-foreground">Raco AI Assistant</h1>
+            <p className="text-xs text-muted-foreground">{loading ? 'Thinking…' : 'Your intelligence assistant'}</p>
           </div>
         </div>
       </div>
@@ -100,8 +95,11 @@ export default function AskRaco() {
       <div className="flex-1 overflow-y-auto px-6 py-6">
         {empty ? (
           <div className="flex flex-col items-center justify-center h-full gap-6 max-w-lg mx-auto text-center">
-            <div className="w-12 h-12 rounded-xl bg-evergreen-tint flex items-center justify-center">
-              <Zap className="w-6 h-6 text-evergreen" />
+            <div
+              className="rounded-2xl overflow-hidden shadow-lg"
+              style={{ background: '#ffffff', width: 160, height: 160 }}
+            >
+              <RacoAvatar state="idle" size="lg" />
             </div>
             <div>
               <h2 className="text-base font-semibold text-foreground">What would you like to know?</h2>
@@ -125,10 +123,8 @@ export default function AskRaco() {
           <div className="space-y-4 max-w-3xl mx-auto">
             {messages.map((m, i) => <MessageBubble key={i} msg={m} />)}
             {loading && (
-              <div className="flex gap-3">
-                <div className="w-7 h-7 rounded-md bg-evergreen flex items-center justify-center shrink-0">
-                  <Zap className="w-3.5 h-3.5 text-white" />
-                </div>
+              <div className="flex gap-3 items-end">
+                <RacoAvatar state="processing" size="sm" />
                 <div className="bg-card border border-hairline rounded-xl px-4 py-3 flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 bg-muted-2 rounded-full animate-pulse-dot" style={{ animationDelay: '0ms' }} />
                   <span className="w-1.5 h-1.5 bg-muted-2 rounded-full animate-pulse-dot" style={{ animationDelay: '200ms' }} />
