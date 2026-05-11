@@ -8,17 +8,20 @@ export default function AgentAssignBadge({ lead, agents, onAssigned }) {
   const [saving, setSaving] = useState(false);
 
   const currentAgent = agents.find(a =>
-    a.pixxi_email === lead.pixxi_user_email || a.primary_email === lead.pixxi_user_email
+    a.pixxi_email === lead.pixxi_user_email ||
+    a.primary_email === lead.pixxi_user_email ||
+    a.email === lead.pixxi_user_email
   );
 
   async function assign(agent) {
     setSaving(true);
     setOpen(false);
+    const newEmail = agent.pixxi_email || agent.primary_email || agent.email;
     await supabase
       .from('pixxi_leads')
-      .update({ pixxi_user_email: agent.pixxi_email || agent.primary_email })
+      .update({ pixxi_user_email: newEmail })
       .eq('id', lead.id);
-    onAssigned?.(lead.id, agent.pixxi_email || agent.primary_email);
+    onAssigned?.(lead.id, newEmail);
     setSaving(false);
   }
 
@@ -54,7 +57,7 @@ export default function AgentAssignBadge({ lead, agents, onAssigned }) {
                   <span className="text-[9px] font-bold text-evergreen">{(a.full_name || '?').charAt(0)}</span>
                 </div>
                 <span className="text-foreground truncate flex-1">{a.full_name}</span>
-                {(a.pixxi_email === lead.pixxi_user_email || a.primary_email === lead.pixxi_user_email) && (
+                {(a.pixxi_email === lead.pixxi_user_email || a.primary_email === lead.pixxi_user_email || a.email === lead.pixxi_user_email) && (
                   <Check className="w-3 h-3 text-evergreen shrink-0" />
                 )}
               </button>

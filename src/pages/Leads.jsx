@@ -50,7 +50,7 @@ export default function Leads() {
     setLoading(true);
     Promise.all([
       getLeads(lensEmail),
-      getPixxiListings(lensEmail),
+      getPixxiListings(lensEmail, { filterByAgent: false }),
       getPixxiUsers(),
     ]).then(([leadsData, listingsData, agentsData]) => {
       const scored = leadsData.map(l => ({ ...l, _score: computeLeadScore(l) }));

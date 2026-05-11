@@ -101,7 +101,7 @@ export async function getMarketSummary() {
 export async function getPixxiUsers() {
   const { data, error } = await supabase
     .from('pixxi_users')
-    .select('id,full_name,email,role,lifecycle_status,is_active')
+    .select('id,full_name,email,pixxi_email,primary_email,role,lifecycle_status,is_active')
     .order('full_name', { ascending: true });
   if (error) return [];
   return data || [];
@@ -118,9 +118,9 @@ export async function updatePixxiUserLifecycle(userId, lifecycle_status) {
 
 // ─── Pixxi Listings ──────────────────────────────────────────────────────
 
-export async function getPixxiListings(userEmail) {
-  let q = supabase.from('pixxi_listings').select('*').limit(100).order('created_at', { ascending: false });
-  if (userEmail) q = q.eq('pixxi_user_email', userEmail);
+export async function getPixxiListings(userEmail, { filterByAgent = true } = {}) {
+  let q = supabase.from('pixxi_listings').select('*').limit(200).order('created_at', { ascending: false });
+  if (userEmail && filterByAgent) q = q.eq('pixxi_user_email', userEmail);
   const { data, error } = await q;
   if (error) return [];
   return data || [];
