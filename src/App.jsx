@@ -13,7 +13,7 @@ import Home from '@/pages/Home';
 import AskRaco from '@/pages/AskRaco';
 import Activity from '@/pages/Activity';
 import Contacts from '@/pages/Contacts';
-import Leads from '@/pages/Leads';
+import Leads from '@/pages/Leads.jsx';
 import Inventory from '@/pages/Inventory';
 import Zones from '@/pages/Zones';
 import Deals from '@/pages/Deals';
