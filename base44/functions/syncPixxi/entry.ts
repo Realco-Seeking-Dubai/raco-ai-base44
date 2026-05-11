@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-const PIXXI_BASE_URL = Deno.env.get('PIXXI_BASE_URL');
+const PIXXI_BASE_URL = Deno.env.get('PIXXI_BASE_URL') || 'https://pixxicrm.ae';
 const PIXXI_API_TOKEN = Deno.env.get('PIXXI_API_TOKEN');
 const SUPABASE_URL = 'https://chuyaqczfjkbzxwvhsnm.supabase.co';
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -95,6 +95,10 @@ async function syncListings() {
 
 Deno.serve(async (req) => {
   try {
+    if (!PIXXI_API_TOKEN) {
+      return Response.json({ error: 'PIXXI_API_TOKEN not configured' }, { status: 500 });
+    }
+
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
 
