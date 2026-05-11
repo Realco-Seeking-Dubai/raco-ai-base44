@@ -1,88 +1,89 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
+    /* Realco Prime — Surfaces */
+    --bg: 0 0% 100%;
+    --surface: 60 11% 97%;
+    --surface-2: 45 18% 93%;
+
+    /* Ink */
+    --foreground: 0 0% 4%;
+    --ink-soft: 0 0% 12%;
+    --muted-foreground: 0 0% 44%;
+    --muted-2: 0 0% 61%;
+
+    /* Borders */
+    --hairline: 40 14% 89%;
+    --hairline-strong: 38 16% 83%;
+
+    /* Brand */
+    --evergreen: 158 42% 22%;
+    --evergreen-mid: 158 38% 30%;
+    --evergreen-light: 158 30% 42%;
+    --evergreen-tint: 158 28% 94%;
+
+    --brass: 38 72% 44%;
+    --brass-light: 38 68% 56%;
+    --brass-tint: 38 60% 94%;
+
+    --terracotta: 14 65% 44%;
+    --terracotta-tint: 14 55% 94%;
+
+    --sky: 210 72% 52%;
+    --sky-tint: 210 60% 94%;
+
+    /* shadcn compat */
+    --background: var(--bg);
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
+    --card-foreground: 0 0% 4%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
+    --popover-foreground: 0 0% 4%;
+    --primary: 158 42% 22%;
     --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
+    --secondary: 60 11% 97%;
+    --secondary-foreground: 0 0% 4%;
+    --muted: 60 11% 97%;
+    --accent: 38 72% 44%;
     --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 14 65% 44%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --border: 40 14% 89%;
+    --input: 40 14% 89%;
+    --ring: 158 42% 22%;
+    --radius: 0.5rem;
+
+    /* sidebar */
+    --sidebar-background: 158 42% 18%;
+    --sidebar-foreground: 158 20% 88%;
+    --sidebar-primary: 38 72% 44%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 158 38% 25%;
+    --sidebar-accent-foreground: 158 20% 92%;
+    --sidebar-border: 158 38% 15%;
+    --sidebar-ring: 38 72% 44%;
   }
-}
 
-
-
-@layer base {
   * {
     @apply border-border outline-ring/50;
   }
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  code, pre, .mono {
+    font-family: 'Geist Mono', 'Fira Code', monospace;
   }
 }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: hsl(var(--hairline-strong)); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); }

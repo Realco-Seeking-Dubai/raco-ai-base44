@@ -5,43 +5,63 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
-// Add page imports here
+import Layout from '@/components/Layout';
+
+// Pages
+import Home from '@/pages/Home';
+import AskRaco from '@/pages/AskRaco';
+import Activity from '@/pages/Activity';
+import Contacts from '@/pages/Contacts';
+import Leads from '@/pages/Leads';
+import Inventory from '@/pages/Inventory';
+import Zones from '@/pages/Zones';
+import Deals from '@/pages/Deals';
+import Market from '@/pages/Market';
+import Marketing from '@/pages/Marketing';
+import Compliance from '@/pages/Compliance';
+import Admin from '@/pages/Admin';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
 
-  // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
+      <div className="fixed inset-0 flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-evergreen/20 border-t-evergreen rounded-full animate-spin" />
+          <span className="text-sm text-muted-foreground">Loading Raco AI…</span>
+        </div>
       </div>
     );
   }
 
-  // Handle authentication errors
   if (authError) {
-    if (authError.type === 'user_not_registered') {
-      return <UserNotRegisteredError />;
-    } else if (authError.type === 'auth_required') {
-      // Redirect to login automatically
-      navigateToLogin();
-      return null;
-    }
+    if (authError.type === 'user_not_registered') return <UserNotRegisteredError />;
+    if (authError.type === 'auth_required') { navigateToLogin(); return null; }
   }
 
-  // Render the main app
   return (
     <Routes>
-      {/* Add your page Route elements here */}
+      <Route element={<Layout />}>
+        <Route path="/" element={<Home />} />
+        <Route path="/ask" element={<AskRaco />} />
+        <Route path="/activity" element={<Activity />} />
+        <Route path="/contacts" element={<Contacts />} />
+        <Route path="/leads" element={<Leads />} />
+        <Route path="/inventory" element={<Inventory />} />
+        <Route path="/zones" element={<Zones />} />
+        <Route path="/deals" element={<Deals />} />
+        <Route path="/market" element={<Market />} />
+        <Route path="/marketing" element={<Marketing />} />
+        <Route path="/compliance" element={<Compliance />} />
+        <Route path="/admin" element={<Admin />} />
+      </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
 };
 
-
 function App() {
-
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
@@ -51,7 +71,7 @@ function App() {
         <Toaster />
       </QueryClientProvider>
     </AuthProvider>
-  )
+  );
 }
 
-export default App
+export default App;
