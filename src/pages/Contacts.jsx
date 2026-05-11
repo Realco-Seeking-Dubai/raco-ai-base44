@@ -19,16 +19,34 @@ export default function Contacts() {
   const [showSidebar, setShowSidebar] = useState(true);
 
   useEffect(() => {
-    getPixxiUsers()
-      .then(users => {
-        setContacts(users || []);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Contacts fetch error:', err);
-        setContacts([]);
-        setLoading(false);
+    Promise.all([
+      getPixxiListings(null, { filterByAgent: false }),
+      getPixxiUsers(),
+    ]).then(([listings, users]) => {
+      // Map listings + users to contacts (agents who have listings)
+      const agentMap = new Map();
+      listings.forEach(l => {
+        if (!agentMap.has(l.pixxi_user_email)) {
+          agentMap.set(l.pixxi_user_email, {
+            pixxi_email: l.pixxi_user_email,
+            full_name: l.agent_name || 'Unknown Agent',
+            primary_email: l.pixxi_user_email,
+            property_count: 0,
+            confidence_score: 0.8,
+          });
+        }
+        const contact = agentMap.get(l.pixxi_user_email);
+        contact.property_count = (contact.property_count || 0) + 1;
       });
+      
+      const mapped = Array.from(agentMap.values());
+      setContacts(mapped);
+      setLoading(false);
+    }).catch(err => {
+      console.error('Contacts fetch error:', err);
+      setContacts([]);
+      setLoading(false);
+    });
   }, []);
 
   const sorted = [...contacts].sort((a, b) => {
@@ -38,7 +56,7 @@ export default function Contacts() {
       case 'confidence_desc':
         return (b.confidence_score || 0) - (a.confidence_score || 0);
       default: // last_contact
-        return new Date(b.last_contact_at || 0) - new Date(a.last_contact_at || 0);
+        return (b.property_count || 0) - (a.property_count || 0);
     }
   });
 
@@ -124,7 +142,7 @@ export default function Contacts() {
               <div className="text-xs text-muted-foreground mb-3">{filtered.length} contact{filtered.length !== 1 ? 's' : ''}</div>
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {filtered.map(c => (
-                  <div key={c.id} onClick={() => setSelectedContact(c)} className="bg-card border border-hairline rounded-xl p-4 hover:border-hairline-strong hover:shadow-sm transition-all cursor-pointer">
+                  <div key={c.pixxi_email} onClick={() => setSelectedContact(c)} className="bg-card border border-hairline rounded-xl p-4 hover:border-hairline-strong hover:shadow-sm transition-all cursor-pointer">
                     <div className="flex items-start gap-3">
                       <div className="w-9 h-9 rounded-full bg-evergreen-tint flex items-center justify-center shrink-0">
                         <span className="text-sm font-semibold text-evergreen">
@@ -133,13 +151,15 @@ export default function Contacts() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-foreground truncate">{c.full_name || 'Unknown'}</div>
-                        <div className="text-xs text-muted-foreground truncate mt-0.5">{c.email || c.pixxi_email || '—'}</div>
+                        <div className="text-xs text-muted-foreground truncate mt-0.5">{c.primary_email || '—'}</div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 mt-3 flex-wrap">
-                      <StatusBadge status={c.lifecycle_status || 'staged'} />
-                      {c.role && (
-                        <span className="text-[10px] text-muted-2 bg-surface rounded px-1.5 py-0.5">{c.role}</span>
+                      <span className="text-[10px] text-muted-2 bg-surface rounded px-1.5 py-0.5">
+                        {c.property_count || 0} listing{c.property_count !== 1 ? 's' : ''}
+                      </span>
+                      {c.confidence_score && (
+                        <span className="text-[10px] text-muted-2 font-mono ml-auto">{Math.round(c.confidence_score * 100)}%</span>
                       )}
                     </div>
                   </div>
