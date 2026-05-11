@@ -1,6 +1,7 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import RacoFloatingBot from '@/components/RacoFloatingBot';
 import ViewAsSelector from '@/components/ViewAsSelector';
+import RoccoChatWidget from '@/components/RoccoChatWidget';
 import { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useLens } from '@/lib/LensContext';
@@ -8,7 +9,7 @@ import { base44 } from '@/api/base44Client';
 import {
   Home, MessageSquare, Activity, Users, TrendingUp, Building2,
   MapPin, BarChart3, Megaphone, Settings, Shield, ChevronDown,
-  Menu, X, Bell, LogOut, User, ChevronRight
+  Menu, X, Bell, LogOut, User, ChevronRight, Zap
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -48,9 +49,13 @@ const NAV = [
     items: [
       { label: 'Compliance & Audit', path: '/compliance', icon: Shield },
       { label: 'Users & Admin', path: '/admin', icon: Settings },
+      { label: 'Agents', path: '/agents', icon: Zap },
     ],
   },
 ];
+
+import { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 function NavItem({ item, collapsed }) {
   const location = useLocation();
@@ -85,6 +90,7 @@ export default function Layout() {
     items: g.items.filter(item => {
       if (item.path === '/admin' && !isAdmin) return false;
       if (item.path === '/compliance' && !isAdmin) return false;
+      if (item.path === '/agents' && !(isAdmin || user?.role === 'sales_manager')) return false;
       return true;
     }),
   })).filter(g => g.items.length > 0);
@@ -227,6 +233,9 @@ export default function Layout() {
 
       {/* Raco AI floating bot — draggable, visible on all pages */}
       <RacoFloatingBot />
+
+      {/* Rocco Chat Widget */}
+      <RoccoChatWidget />
     </div>
   );
 }

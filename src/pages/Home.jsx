@@ -9,7 +9,7 @@ import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import StatsSection from '@/components/home/StatsSection';
 import IrfanDataSections from '@/components/home/IrfanDataSections';
-import { getDeals } from '@/lib/supabase';
+import { getDeals, agentDb } from '@/lib/supabase';
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -25,6 +25,7 @@ export default function Home() {
   const [tasks, setTasks] = useState([]);
   const [activity, setActivity] = useState([]);
   const [deals, setDeals] = useState([]);
+  const [agentActivity, setAgentActivity] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const queryEmail = lensEmail || user?.email;
@@ -36,11 +37,18 @@ export default function Home() {
       getAgentTasks(queryEmail),
       getActivityTimeline(queryEmail),
       getDeals(),
-    ]).then(([s, t, a, d]) => {
+      agentDb.from('SuperAgent')
+        .select('agent_name,avatar_emoji,last_triggered_at')
+        .eq('is_active', true)
+        .order('last_triggered_at', { ascending: false })
+        .limit(5)
+        .then(({ data }) => data || []),
+    ]).then(([s, t, a, d, agents]) => {
       setSuggestions(s);
       setTasks(t);
       setActivity(a);
       setDeals(d);
+      setAgentActivity(agents);
     }).catch(() => {}).finally(() => setLoading(false));
   }, [queryEmail]);
 
@@ -150,6 +158,33 @@ export default function Home() {
 
       {/* Stats Section */}
       <StatsSection tasks={tasks} activity={activity} deals={deals} loading={loading} />
+
+      {/* Today's Agent Activity */}
+      {agentActivity.length > 0 && (
+        <div className="mt-6 bg-card border border-hairline rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-hairline bg-gradient-to-r from-evergreen-tint to-transparent">
+            <span className="text-sm font-medium text-evergreen">Today's Agent Activity</span>
+          </div>
+          <div className="divide-y divide-hairline">
+            {agentActivity.map((a, i) => {
+              const timeAgo = a.last_triggered_at 
+                ? Math.floor((Date.now() - new Date(a.last_triggered_at).getTime()) / 60000)
+                : null;
+              return (
+                <div key={i} className="px-4 py-3 flex items-center gap-3">
+                  <span className="text-lg">{a.avatar_emoji || '🤖'}</span>
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-foreground">{a.agent_name}</div>
+                  </div>
+                  <div className="text-xs text-muted-2 shrink-0">
+                    {timeAgo !== null ? `Triggered ${timeAgo < 1 ? 'just now' : `${timeAgo}m ago`}` : '—'}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Recent Activity */}
       {activity.length > 0 && (

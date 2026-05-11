@@ -21,6 +21,7 @@ import Market from '@/pages/Market';
 import Marketing from '@/pages/Marketing';
 import Compliance from '@/pages/Compliance';
 import Admin from '@/pages/Admin';
+import Agents from '@/pages/Agents';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -56,6 +57,7 @@ const AuthenticatedApp = () => {
         <Route path="/marketing" element={<Marketing />} />
         <Route path="/compliance" element={<Compliance />} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/agents" element={<Agents />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
