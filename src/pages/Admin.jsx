@@ -4,7 +4,8 @@ import PageHeader from '@/components/ui/PageHeader';
 import StatusBadge from '@/components/ui/StatusBadge';
 import EmptyState from '@/components/ui/EmptyState';
 import UserLifecycleActions from '@/components/admin/UserLifecycleActions';
-import { Users, Search, RefreshCw } from 'lucide-react';
+import UserDetailPanel from '@/components/admin/UserDetailPanel';
+import { Users, Search, RefreshCw, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const TABS = ['Users', 'Scope Map'];
@@ -14,6 +15,7 @@ export default function Admin() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('Users');
   const [search, setSearch] = useState('');
+  const [selectedUser, setSelectedUser] = useState(null);
 
   function loadUsers() {
     setLoading(true);
@@ -25,11 +27,15 @@ export default function Admin() {
 
   useEffect(() => { loadUsers(); }, []);
 
-  // Optimistic update — reflects change instantly without a refetch
-  function handleUserUpdated(userId, newStatus) {
-    setUsers(prev => prev.map(u =>
-      u.id === userId ? { ...u, lifecycle_status: newStatus, is_active: newStatus === 'active' } : u
-    ));
+  function handleUserUpdated(userId, updatedData) {
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, ...updatedData } : u));
+    // Keep panel in sync
+    if (selectedUser?.id === userId) setSelectedUser(u => ({ ...u, ...updatedData }));
+  }
+
+  // Legacy lifecycle-only callback for inline actions
+  function handleLifecycleUpdated(userId, newStatus) {
+    handleUserUpdated(userId, { lifecycle_status: newStatus, is_active: newStatus === 'active' });
   }
 
   const filtered = users.filter(u =>
@@ -40,7 +46,7 @@ export default function Admin() {
     <div className="p-6 animate-fade-in">
       <PageHeader
         title="Users & Admin"
-        subtitle="Manage team members and scope assignments"
+        subtitle={`${users.length} total users`}
         actions={
           <button onClick={loadUsers} className="px-3 py-1.5 text-sm rounded-lg border border-hairline bg-card font-medium flex items-center gap-1.5 hover:bg-surface transition-colors text-muted-foreground">
             <RefreshCw className="w-3.5 h-3.5" /> Refresh
@@ -90,8 +96,9 @@ export default function Admin() {
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">User</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">Role</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">Active</th>
-                    <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">Lifecycle Actions</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Active</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Lifecycle Actions</th>
+                    <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">Details</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-hairline">
@@ -108,16 +115,26 @@ export default function Admin() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground text-xs">{u.role || 'user'}</td>
-                      <td className="px-4 py-3"><StatusBadge status={u.lifecycle_status || 'staged'} /></td>
                       <td className="px-4 py-3">
+                        <span className="text-xs font-medium text-muted-foreground bg-surface px-2 py-0.5 rounded">{u.role || 'user'}</span>
+                      </td>
+                      <td className="px-4 py-3"><StatusBadge status={u.lifecycle_status || 'staged'} /></td>
+                      <td className="px-4 py-3 hidden sm:table-cell">
                         <span className={cn('inline-flex items-center gap-1 text-xs font-medium', u.is_active ? 'text-evergreen' : 'text-muted-2')}>
                           <span className={cn('w-1.5 h-1.5 rounded-full', u.is_active ? 'bg-evergreen' : 'bg-muted-2')} />
                           {u.is_active ? 'Yes' : 'No'}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
-                        <UserLifecycleActions user={u} onUpdated={handleUserUpdated} />
+                      <td className="px-4 py-3 hidden lg:table-cell">
+                        <UserLifecycleActions user={u} onUpdated={handleLifecycleUpdated} />
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => setSelectedUser(u)}
+                          className="inline-flex items-center gap-1 text-xs text-evergreen hover:text-evergreen-mid font-medium"
+                        >
+                          Edit <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -132,6 +149,15 @@ export default function Admin() {
         <div className="bg-card border border-hairline rounded-xl p-6">
           <p className="text-sm text-muted-foreground">Scope assignments are derived from Pixxi listings and user zone preferences. Manage via the Pixxi dashboard or contact your system admin.</p>
         </div>
+      )}
+
+      {/* User Detail Panel */}
+      {selectedUser && (
+        <UserDetailPanel
+          user={selectedUser}
+          onClose={() => setSelectedUser(null)}
+          onUserUpdated={handleUserUpdated}
+        />
       )}
     </div>
   );
