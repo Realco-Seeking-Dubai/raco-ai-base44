@@ -44,8 +44,8 @@ export default function RacoAvatar({ state = 'idle', size = 'md' }) {
 
   return (
     <div
-      className={`${sizeClasses[size]} rounded-full overflow-hidden shrink-0 bg-white`}
-      style={{ backgroundColor: '#ffffff' }}
+      className={`${sizeClasses[size]} rounded-full overflow-hidden shrink-0`}
+      style={{ background: 'hsl(var(--background))' }}
     >
       <img
         src={src}

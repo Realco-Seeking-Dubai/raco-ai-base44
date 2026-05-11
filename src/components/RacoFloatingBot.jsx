@@ -1,18 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-
-const IMAGES = {
-  idle: 'https://media.base44.com/images/public/6a01a130e9db43abba4284d6/2969298a3_Raco.jpg',
-  thinking1: 'https://media.base44.com/images/public/6a01a130e9db43abba4284d6/2542b1c85_thinking2.jpg',
-  thinking2: 'https://media.base44.com/images/public/6a01a130e9db43abba4284d6/659768264_thinking5.jpg',
-  thinking3: 'https://media.base44.com/images/public/6a01a130e9db43abba4284d6/3e8383681_thinking.jpg',
-  thinking4: 'https://media.base44.com/images/public/6a01a130e9db43abba4284d6/3db4325d2_thinking2.jpg',
-  processing1: 'https://media.base44.com/images/public/6a01a130e9db43abba4284d6/a83520e40_procesing.jpg',
-  processing2: 'https://media.base44.com/images/public/6a01a130e9db43abba4284d6/8aaab4cb8_processing.jpg',
-};
-
-const THINKING_FRAMES = [IMAGES.thinking1, IMAGES.thinking2, IMAGES.thinking3, IMAGES.thinking4];
-const PROCESSING_FRAMES = [IMAGES.processing1, IMAGES.processing2];
+import RacoAvatar from '@/components/ask/RacoAvatar';
 
 // Page-context hints shown in tooltip bubble
 const PAGE_HINTS = {
@@ -42,7 +30,6 @@ export default function RacoFloatingBot() {
   const ref = useRef(null);
 
   // Animation state
-  const [frame, setFrame] = useState(0);
   const [botState, setBotState] = useState('idle'); // idle | thinking | processing
   const [showHint, setShowHint] = useState(false);
   const hintTimer = useRef(null);
@@ -50,9 +37,7 @@ export default function RacoFloatingBot() {
   // Show hint bubble when page changes
   useEffect(() => {
     setBotState('thinking');
-    setFrame(0);
     clearTimeout(hintTimer.current);
-    // After 1.2s show hint, revert to idle after 3s
     hintTimer.current = setTimeout(() => {
       setBotState('idle');
       setShowHint(true);
@@ -60,21 +45,6 @@ export default function RacoFloatingBot() {
     }, 1200);
     return () => clearTimeout(hintTimer.current);
   }, [location.pathname]);
-
-  // Frame cycling
-  useEffect(() => {
-    if (botState === 'idle') { setFrame(0); return; }
-    const frames = botState === 'thinking' ? THINKING_FRAMES : PROCESSING_FRAMES;
-    const id = setInterval(() => setFrame(f => (f + 1) % frames.length),
-      botState === 'thinking' ? 500 : 350);
-    return () => clearInterval(id);
-  }, [botState]);
-
-  const src = botState === 'idle'
-    ? IMAGES.idle
-    : botState === 'thinking'
-      ? THINKING_FRAMES[frame]
-      : PROCESSING_FRAMES[frame];
 
   // Drag handlers
   const onMouseDown = (e) => {
@@ -175,22 +145,15 @@ export default function RacoFloatingBot() {
             animation: botState !== 'idle' ? 'none' : undefined,
           }}
         />
-        {/* Bot image */}
+        {/* Bot image — uses RacoAvatar to keep exact original shape/design */}
         <div
-          className="w-16 h-16 rounded-full overflow-hidden shadow-xl ring-2 ring-white/60"
+          className="shadow-xl ring-2 ring-white/60 rounded-full"
           style={{
-            background: '#ffffff',
             transform: botState !== 'idle' ? 'scale(1.05)' : 'scale(1)',
             transition: 'transform 0.2s ease',
           }}
         >
-          <img
-            src={src}
-            alt="Raco AI"
-            draggable={false}
-            className="w-full h-full object-cover"
-            style={{ objectPosition: 'center 10%' }}
-          />
+          <RacoAvatar state={botState} size="md" />
         </div>
 
         {/* Label below */}
