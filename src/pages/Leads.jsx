@@ -9,6 +9,7 @@ import LeadMetricsBar from '@/components/leads/LeadMetricsBar';
 import LeadDetailDrawer from '@/components/leads/LeadDetailDrawer';
 import ListingLinkBadge, { matchListings } from '@/components/leads/ListingLinkBadge';
 import AgentAssignBadge from '@/components/leads/AgentAssignBadge';
+import LeadKanban from '@/components/leads/LeadKanban';
 import { TrendingUp, Search, Zap, LayoutGrid, List, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -83,6 +84,11 @@ export default function Leads() {
   function handleAssigned(leadId, newEmail) {
     setLeads(prev => prev.map(l => l.id === leadId ? { ...l, pixxi_user_email: newEmail } : l));
     if (selectedLead?.id === leadId) setSelectedLead(l => ({ ...l, pixxi_user_email: newEmail }));
+  }
+
+  function handleLeadUpdated(leadId, updates) {
+    setLeads(prev => prev.map(l => l.id === leadId ? { ...l, ...updates } : l));
+    if (selectedLead?.id === leadId) setSelectedLead(l => ({ ...l, ...updates }));
   }
 
   return (
@@ -178,58 +184,7 @@ export default function Leads() {
           {STAGES.map(s => <div key={s} className="w-64 shrink-0 h-64 bg-surface rounded-xl animate-pulse" />)}
         </div>
       ) : view === 'kanban' ? (
-        <div className="flex gap-4 overflow-x-auto pb-4 min-h-[400px]">
-          {byStage.map(({ stage, items }) => {
-            const style = STAGE_STYLES[stage];
-            return (
-              <div key={stage} className="w-64 shrink-0 flex flex-col">
-                <div className={cn('flex items-center justify-between mb-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold', style.header)}>
-                  <span>{stage}</span>
-                  <span className="opacity-70 font-mono">{items.length}</span>
-                </div>
-                <div className="flex-1 bg-surface/50 rounded-xl p-2 space-y-2 min-h-[120px]">
-                  {items.length === 0 ? (
-                    <div className="h-14 rounded-lg border border-dashed border-hairline flex items-center justify-center text-xs text-muted-2">Empty</div>
-                  ) : items.map(lead => {
-                    const matched = matchListings(lead, listings);
-                    return (
-                      <div
-                        key={lead.id}
-                        onClick={() => setSelectedLead(lead)}
-                        className={cn(
-                          'bg-card border-t-2 rounded-xl p-3 shadow-sm hover:shadow-md transition-all cursor-pointer',
-                          style.border, 'border-x border-b border-hairline',
-                          getScoreTier(lead._score) === 'hot' && 'ring-1 ring-terracotta/30'
-                        )}
-                      >
-                        <div className="flex items-start justify-between gap-1 mb-1.5">
-                          <div className="text-sm font-medium text-foreground truncate">{lead.contact_name || 'Unknown'}</div>
-                        </div>
-                        <div className="flex flex-wrap gap-1 mb-1.5">
-                          <LeadScoreBadge score={lead._score} showLabel={false} />
-                          {lead.source && (
-                            <span className={cn('inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium', SOURCE_COLORS[lead.source?.toLowerCase()] || 'bg-surface-2 text-muted-foreground')}>
-                              {lead.source}
-                            </span>
-                          )}
-                          {matched.length > 0 && <ListingLinkBadge count={matched.length} />}
-                        </div>
-                        {lead.budget_aed && (
-                          <div className="text-xs text-muted-foreground font-mono">
-                            AED {Number(lead.budget_aed).toLocaleString()}
-                          </div>
-                        )}
-                        <div className="mt-2" onClick={e => e.stopPropagation()}>
-                          <AgentAssignBadge lead={lead} agents={agents} onAssigned={handleAssigned} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <LeadKanban leads={filtered} listings={listings} agents={agents} onLeadUpdated={handleLeadUpdated} />
       ) : (
         filtered.length === 0 ? (
           <EmptyState icon={TrendingUp} title="No leads found" />
