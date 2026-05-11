@@ -19,34 +19,16 @@ export default function Contacts() {
   const [showSidebar, setShowSidebar] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      getPixxiListings(null, { filterByAgent: false }),
-      getPixxiUsers(),
-    ]).then(([listings, users]) => {
-      // Map listings + users to contacts (agents who have listings)
-      const agentMap = new Map();
-      listings.forEach(l => {
-        if (!agentMap.has(l.pixxi_user_email)) {
-          agentMap.set(l.pixxi_user_email, {
-            pixxi_email: l.pixxi_user_email,
-            full_name: l.agent_name || 'Unknown Agent',
-            primary_email: l.pixxi_user_email,
-            property_count: 0,
-            confidence_score: 0.8,
-          });
-        }
-        const contact = agentMap.get(l.pixxi_user_email);
-        contact.property_count = (contact.property_count || 0) + 1;
+    getPixxiUsers()
+      .then(users => {
+        setContacts(users || []);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Contacts fetch error:', err);
+        setContacts([]);
+        setLoading(false);
       });
-      
-      const mapped = Array.from(agentMap.values());
-      setContacts(mapped);
-      setLoading(false);
-    }).catch(err => {
-      console.error('Contacts fetch error:', err);
-      setContacts([]);
-      setLoading(false);
-    });
   }, []);
 
   const sorted = [...contacts].sort((a, b) => {
@@ -151,31 +133,13 @@ export default function Contacts() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-foreground truncate">{c.full_name || 'Unknown'}</div>
-                        <div className="text-xs text-muted-foreground truncate mt-0.5">{c.primary_email || c.primary_phone_normalized || '—'}</div>
+                        <div className="text-xs text-muted-foreground truncate mt-0.5">{c.email || c.pixxi_email || '—'}</div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 mt-3 flex-wrap">
-                      {c.current_tag && <StatusBadge status={c.current_tag} />}
-                      {c.is_client && <StatusBadge status="client" />}
-                      {c.lead_source && (
-                        <span className="text-[10px] text-muted-2 bg-surface rounded px-1.5 py-0.5">{c.lead_source}</span>
-                      )}
-                      {c.confidence_score && (
-                        <span className="text-[10px] text-muted-2 font-mono ml-auto">{Math.round(c.confidence_score * 100)}%</span>
-                      )}
-                    </div>
-                    <div className="flex gap-2 mt-3">
-                      {c.primary_phone_normalized && (
-                        <a href={`tel:${c.primary_phone_normalized}`} onClick={e => e.stopPropagation()}
-                          className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs rounded-lg border border-hairline hover:bg-surface transition-colors text-muted-foreground hover:text-foreground">
-                          <Phone className="w-3 h-3" /> Call
-                        </a>
-                      )}
-                      {c.primary_phone_normalized && (
-                        <a href={`https://wa.me/${c.primary_phone_normalized?.replace(/\D/g, '')}`} target="_blank" onClick={e => e.stopPropagation()}
-                          className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs rounded-lg border border-hairline hover:bg-surface transition-colors text-muted-foreground hover:text-foreground">
-                          <MessageCircle className="w-3 h-3" /> WhatsApp
-                        </a>
+                      <StatusBadge status={c.lifecycle_status || 'staged'} />
+                      {c.role && (
+                        <span className="text-[10px] text-muted-2 bg-surface rounded px-1.5 py-0.5">{c.role}</span>
                       )}
                     </div>
                   </div>
