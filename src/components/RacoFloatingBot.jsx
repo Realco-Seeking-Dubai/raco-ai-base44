@@ -33,7 +33,7 @@ export default function RacoFloatingBot() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [pos, setPos] = useState({ x: window.innerWidth - 96, y: window.innerHeight - 120 });
+  const [pos, setPos] = useState({ x: window.innerWidth - 96, y: 24 });
   const [dragging, setDragging] = useState(false);
   const [hasDragged, setHasDragged] = useState(false);
   const dragStart = useRef(null);
