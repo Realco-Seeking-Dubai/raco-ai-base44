@@ -4,11 +4,12 @@ const SUPABASE_URL = 'https://chuyaqczfjkbzxwvhsnm.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_Am8DfqZNOJWfvuYU1DV1Hg_l2RVuCAX';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+export const agentDb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { db: { schema: 'agent' } });
 
 // ─── Network & Contacts ────────────────────────────────────────────────────
 
 export async function getNetworkContacts({ search } = {}) {
-  let q = supabase.from('network_of_contacts').select('*').limit(100).order('last_contact_at', { ascending: false, nullsFirst: false });
+  let q = agentDb.from('network_of_contacts').select('*').limit(100).order('last_contact_at', { ascending: false, nullsFirst: false });
   if (search) q = q.ilike('full_name', `%${search}%`);
   const { data, error } = await q;
   if (error) throw error;
@@ -28,7 +29,7 @@ export async function getLeads(lensEmail) {
 // ─── Deals ────────────────────────────────────────────────────────────────
 
 export async function getDeals() {
-  const { data, error } = await supabase.from('deals').select('*').limit(200).order('created_at', { ascending: false });
+  const { data, error } = await agentDb.from('deals').select('*').limit(200).order('created_at', { ascending: false });
   if (error) return [];
   return data || [];
 }
@@ -42,7 +43,7 @@ export async function getOwners() {
 }
 
 export async function getOwnerStatus(userEmail) {
-  const { data, error } = await supabase.from('owner_status').select('*').eq('agent_email', userEmail).limit(200);
+  const { data, error } = await agentDb.from('owner_status').select('*').eq('agent_email', userEmail).limit(200);
   if (error) return [];
   return data || [];
 }
@@ -50,7 +51,7 @@ export async function getOwnerStatus(userEmail) {
 // ─── AI Suggestions ───────────────────────────────────────────────────────
 
 export async function getAiSuggestions(userEmail) {
-  const { data, error } = await supabase
+  const { data, error } = await agentDb
     .from('ai_suggestions')
     .select('*')
     .eq('target_agent_email', userEmail)
@@ -78,7 +79,7 @@ export async function getAgentTasks(userEmail) {
 // ─── Activity Timeline ────────────────────────────────────────────────────
 
 export async function getActivityTimeline(userEmail) {
-  const { data, error } = await supabase
+  const { data, error } = await agentDb
     .from('v_activity_timeline')
     .select('*')
     .eq('agent_email', userEmail)
@@ -91,7 +92,7 @@ export async function getActivityTimeline(userEmail) {
 // ─── Market ───────────────────────────────────────────────────────────────
 
 export async function getMarketSummary() {
-  const { data, error } = await supabase.from('project_market_summary').select('*').limit(50);
+  const { data, error } = await agentDb.from('mv_master_project_summary').select('*').limit(50);
   if (error) return [];
   return data || [];
 }
@@ -144,7 +145,7 @@ export async function getPortalLeads(userEmail) {
 // ─── Campaigns ───────────────────────────────────────────────────────────
 
 export async function getCampaigns(userEmail) {
-  const { data, error } = await supabase
+  const { data, error } = await agentDb
     .from('campaigns')
     .select('*')
     .eq('created_by', userEmail)
@@ -154,12 +155,13 @@ export async function getCampaigns(userEmail) {
   return data || [];
 }
 
-// ─── Compliance / Audit Log ───────────────────────────────────────────────
+// ─── Compliance / Outbound Messages ───────────────────────────────────────────────
 
 export async function getAuditLog() {
-  const { data, error } = await supabase
-    .from('audit_log')
+  const { data, error } = await agentDb
+    .from('outbound_messages')
     .select('*')
+    .not('compliance_status', 'is', null)
     .order('created_at', { ascending: false })
     .limit(100);
   if (error) return [];
@@ -169,7 +171,7 @@ export async function getAuditLog() {
 // ─── Owner Status Update ─────────────────────────────────────────────────
 
 export async function updateOwnerStatus(ownerId, agentEmail, status, note) {
-  const { error } = await supabase.from('owner_status').upsert({
+  const { error } = await agentDb.from('owner_status').upsert({
     owner_id: ownerId,
     agent_email: agentEmail,
     status,
@@ -177,7 +179,7 @@ export async function updateOwnerStatus(ownerId, agentEmail, status, note) {
   });
   if (error) throw error;
   if (note) {
-    await supabase.from('owner_notes').insert({
+    await agentDb.from('owner_notes').insert({
       owner_id: ownerId,
       agent_email: agentEmail,
       note,

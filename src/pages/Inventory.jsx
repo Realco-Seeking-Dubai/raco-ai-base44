@@ -205,22 +205,7 @@ export default function Inventory() {
       {tab === 'Listings' && (
         <div className="space-y-6">
           <ValuationTool />
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <Map className="w-4 h-4 text-evergreen" />
-              <span className="text-sm font-semibold text-foreground">Listing Density Map</span>
-            </div>
-            <PropertyMap
-              height={420}
-              markers={[
-                { id: 'l1', zone: 'Al Furjan', label: 'Al Furjan Listing', type: 'listing', sub: '2BR · AED 1.4M' },
-                { id: 'l2', zone: 'JVC', label: 'JVC Tower', type: 'listing', sub: '1BR · AED 820K' },
-                { id: 'l3', zone: 'Dubai Hills', label: 'Dubai Hills Villa', type: 'listing', sub: '4BR · AED 6.2M' },
-                { id: 'l4', zone: 'Business Bay', label: 'Business Bay Apt', type: 'listing', sub: '2BR · AED 2.1M' },
-                { id: 'l5', zone: 'Downtown', label: 'Downtown Studio', type: 'listing', sub: 'Studio · AED 1.1M' },
-              ]}
-            />
-          </div>
+          <EmptyState icon={Building2} title="Listings module in development" body="Portal and agent listings will load here from real data." />
         </div>
       )}
 

@@ -6,13 +6,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import { BarChart3, TrendingUp, RefreshCw, ArrowUp, ArrowDown } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 
-const MOCK_ZONES = [
-  { zone: 'Core', transactions: 596322, avg_price_m: 2.9, deviation: 3.2 },
-  { zone: 'Suburbs', transactions: 566512, avg_price_m: 2.1, deviation: -1.8 },
-  { zone: 'Waterfront', transactions: 98998, avg_price_m: 7.2, deviation: 8.5 },
-  { zone: 'MBR City', transactions: 58178, avg_price_m: 5.3, deviation: 5.1 },
-  { zone: 'Dubai South', transactions: 33614, avg_price_m: 2.3, deviation: 2.0 },
-];
+
 
 export default function Market() {
   const [summary, setSummary] = useState([]);
@@ -25,8 +19,6 @@ export default function Market() {
       .catch(() => setSummary([]))
       .finally(() => setLoading(false));
   }, []);
-
-  const display = summary.length > 0 ? summary : MOCK_ZONES;
 
   return (
     <div className="p-6 animate-fade-in">
@@ -41,19 +33,27 @@ export default function Market() {
         }
       />
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        <KpiCard label="Total Transactions" value="1.35M" icon={BarChart3} color="evergreen" />
-        <KpiCard label="Total Market Value" value="AED 3.99T" icon={TrendingUp} color="brass" />
-        <KpiCard label="Avg. Transaction" value="AED 2.9M" icon={BarChart3} color="sky" />
-        <KpiCard label="Hot Zones" value="3" icon={TrendingUp} color="terracotta" />
-      </div>
+      {loading ? (
+        <div className="flex gap-3 overflow-x-auto pb-4">
+          {[1, 2, 3, 4, 5].map(i => <div key={i} className="w-64 shrink-0 h-48 bg-surface rounded-xl animate-pulse" />)}
+        </div>
+      ) : summary.length === 0 ? (
+        <EmptyState icon={BarChart3} title="No market data yet" />
+      ) : (
+        <>
+          {/* KPIs */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+            <KpiCard label="Total Transactions" value={`${(summary.reduce((s, z) => s + (z.transactions || 0), 0) / 1e6).toFixed(2)}M`} icon={BarChart3} color="evergreen" />
+            <KpiCard label="Zones" value={summary.length} icon={TrendingUp} color="brass" />
+            <KpiCard label="Avg. Price" value={`AED ${(summary.reduce((s, z) => s + (z.avg_price_m || 0), 0) / summary.length).toFixed(1)}M`} icon={BarChart3} color="sky" />
+            <KpiCard label="Positive Zones" value={summary.filter(z => (z.deviation || 0) >= 0).length} icon={TrendingUp} color="terracotta" />
+          </div>
 
-      {/* Pulse vs Sentiment */}
-      <div className="mb-6">
-        <h3 className="text-sm font-semibold text-foreground mb-3">Pulse vs Sentiment by Zone</h3>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {display.map(z => {
+          {/* Pulse vs Sentiment */}
+          <div className="mb-6">
+            <h3 className="text-sm font-semibold text-foreground mb-3">Pulse vs Sentiment by Zone</h3>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {summary.map(z => {
             const dev = z.deviation || 0;
             const isPos = dev >= 0;
             return (
@@ -91,25 +91,27 @@ export default function Market() {
                 </div>
               </div>
             );
-          })}
-        </div>
-      </div>
+              })}
+            </div>
+          </div>
 
-      {/* Volume chart */}
-      <div className="bg-card border border-hairline rounded-xl p-4">
-        <h3 className="text-sm font-medium text-foreground mb-4">Transaction Volume by Zone</h3>
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={display} barSize={32}>
-            <XAxis dataKey="zone" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis tickFormatter={v => `${(v / 1000).toFixed(0)}K`} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-            <Tooltip
-              formatter={(value) => [`${value.toLocaleString()} transactions`]}
-              contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--hairline))', fontSize: 12 }}
-            />
-            <Bar dataKey="transactions" fill="hsl(var(--evergreen))" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+          {/* Volume chart */}
+          <div className="bg-card border border-hairline rounded-xl p-4">
+            <h3 className="text-sm font-medium text-foreground mb-4">Transaction Volume by Zone</h3>
+            <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={summary} barSize={32}>
+                  <XAxis dataKey="zone" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tickFormatter={v => `${(v / 1000).toFixed(0)}K`} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    formatter={(value) => [`${value.toLocaleString()} transactions`]}
+                    contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--hairline))', fontSize: 12 }}
+                  />
+                  <Bar dataKey="transactions" fill="hsl(var(--evergreen))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </>
+        )}
     </div>
   );
 }
