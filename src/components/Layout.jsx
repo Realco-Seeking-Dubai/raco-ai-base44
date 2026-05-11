@@ -54,9 +54,6 @@ const NAV = [
   },
 ];
 
-import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-
 function NavItem({ item, collapsed }) {
   const location = useLocation();
   const active = location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path));
