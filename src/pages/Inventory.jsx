@@ -8,6 +8,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import InventorySidebar, { BUDGET_RANGES } from '@/components/inventory/InventorySidebar';
 import ValuationTool from '@/components/inventory/ValuationTool';
 import PropertyMap from '@/components/map/PropertyMap';
+import ListingsTab from '@/components/inventory/ListingsTab';
 import { Building2, Search, Plus, StickyNote, Send, CheckSquare, SlidersHorizontal, Map } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -198,7 +199,7 @@ export default function Inventory() {
       {tab === 'Listings' && (
         <div className="space-y-6">
           <ValuationTool />
-          <EmptyState icon={Building2} title="Listings module in development" body="Portal and agent listings will load here from real data." />
+          <ListingsTab />
         </div>
       )}
 
