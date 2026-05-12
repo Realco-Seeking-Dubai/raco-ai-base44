@@ -142,182 +142,84 @@ Deno.serve(async (req) => {
     const allExcelTables = await discoverExcelTables(SUPABASE_URL, SERVICE_KEY);
     const excelTableSet = new Set(allExcelTables);
 
-    // ── Action: initial load (quick sidebar stub) ─────────────────────────────
-    if (action === 'initial_load') {
-      // Return empty structure to let UI render instantly, data loads via separate searches
-      return Response.json({
-        zones: [],
-        loading: true,
-        message: 'Search or browse by zone'
-      });
-    }
-
-    // ── Action: list zones (from actual owners only) ────────────────────────────
+    // ── Action: list zones (from project_intelligence) ──────────────────────────
     if (action === 'zones') {
-      // ADMIN: SKIP WORKSPACE JOINS — return all zones instantly
-      let allowed = null;
-      if (!userIsAdmin) {
-        allowed = await getAllowedZones(supabase, scopeEmail, userIsAdmin, agent_email);
-        if (!allowed || allowed.length === 0) return Response.json({ zones: [] });
-      }
+      // Fetch zones from project_intelligence with simple limit
+      const { data: projects, error } = await agentDb
+        .from('raco_project_intelligence')
+        .select('final_zone_name')
+        .limit(1000);
       
-      // Get top 50 owners from master DB and extract their zones (LEAN: linked_zones only)
-      const { data: allOwners } = await agentDb.from('raco_owner_intelligence').select('linked_zones, owner_area').limit(50);
+      if (error || !projects) return Response.json({ zones: [] });
+      
       const zoneSet = new Set();
-      const projectsNeedingZones = new Set();
-      
-      for (const owner of (allOwners || [])) {
-        // Use linked_zones array if available
-        if (Array.isArray(owner.linked_zones) && owner.linked_zones.length > 0) {
-          for (const z of owner.linked_zones) {
-            if (z) zoneSet.add(z);
-          }
-        } else if (owner.owner_area) {
-          // Mark for lookup via project_intelligence
-          projectsNeedingZones.add(owner.owner_area);
-        }
-      }
-      
-      // Lookup zones for projects that don't have linked_zones populated (LIMIT 100 for speed)
-      if (projectsNeedingZones.size > 0) {
-        const { data: projects } = await agentDb.from('raco_project_intelligence').select('project, final_zone_name').limit(100);
-        const projectZoneMap = new Map();
-        for (const p of (projects || [])) {
-          if (p.project && p.final_zone_name) {
-            projectZoneMap.set(p.project.toLowerCase(), p.final_zone_name);
-          }
-        }
-        
-        for (const proj of projectsNeedingZones) {
-          const zone = projectZoneMap.get(proj.toLowerCase());
-          if (zone) zoneSet.add(zone);
-        }
+      for (const p of projects) {
+        if (p.final_zone_name) zoneSet.add(p.final_zone_name);
       }
       
       const zones = [...zoneSet].sort();
-      console.log(`[getOwnerExplorer] zones | admin: ${userIsAdmin} | count: ${zones.length}`);
+      console.log(`[getOwnerExplorer] zones | count: ${zones.length}`);
       return Response.json({ zones });
     }
 
-    // ── Action: list master projects for a zone (from owners only) ────────────────
+    // ── Action: list master projects for a zone ─────────────────────────────────
     if (action === 'master_projects') {
       if (!zone) return Response.json({ error: 'zone required' }, { status: 400 });
       
-      // ADMIN: SKIP WORKSPACE JOINS — get data instantly
-      let allowed = null;
-      if (!userIsAdmin) {
-        allowed = await getAllowedZones(supabase, scopeEmail, userIsAdmin, agent_email);
-        if (!allowed || allowed.length === 0) return Response.json({ master_projects: [] });
-      }
+      const { data: projects, error } = await agentDb
+        .from('raco_project_intelligence')
+        .select('master_project_name, final_zone_name')
+        .eq('final_zone_name', zone)
+        .limit(1000);
       
-      // Get top 50 owners with LEAN columns (EMERGENCY: skip full fetch)
-      const { data: allOwners } = await agentDb.from('raco_owner_intelligence').select('linked_master_project_names, owner_area, linked_zones').limit(50);
-      
-      // Build project → zone map from project_intelligence (LIMIT 100 for speed)
-      const projectsWithoutZones = new Set();
-      for (const owner of (allOwners || [])) {
-        if (!Array.isArray(owner.linked_zones) || owner.linked_zones.length === 0) {
-          if (owner.owner_area) projectsWithoutZones.add(owner.owner_area);
-        }
-      }
-      
-      const projectZoneMap = new Map();
-      if (projectsWithoutZones.size > 0) {
-        const { data: projects } = await agentDb.from('raco_project_intelligence').select('project, final_zone_name, master_project_name').limit(100);
-        for (const p of (projects || [])) {
-          if (p.project && p.final_zone_name) {
-            projectZoneMap.set(p.project.toLowerCase(), { zone: p.final_zone_name, master: p.master_project_name });
-          }
-        }
-      }
+      if (error || !projects) return Response.json({ master_projects: [] });
       
       const masterSet = new Set();
-      for (const owner of (allOwners || [])) {
-        let ownerZone = null;
-        
-        // Check linked_zones first
-        if (Array.isArray(owner.linked_zones) && owner.linked_zones.includes(zone)) {
-          ownerZone = zone;
-        } else if (owner.owner_area) {
-          // Lookup via project_intelligence
-          const lookup = projectZoneMap.get(owner.owner_area.toLowerCase());
-          if (lookup && lookup.zone === zone) {
-            ownerZone = zone;
-          }
-        }
-        
-        if (ownerZone) {
-          if (Array.isArray(owner.linked_master_project_names)) {
-            for (const m of owner.linked_master_project_names) {
-              if (m) masterSet.add(m);
-            }
-          }
-          // Also add via project_intelligence lookup if needed
-          if (owner.owner_area && projectZoneMap.has(owner.owner_area.toLowerCase())) {
-            const lookup = projectZoneMap.get(owner.owner_area.toLowerCase());
-            if (lookup && lookup.master) masterSet.add(lookup.master);
-          }
-        }
+      for (const p of projects) {
+        if (p.master_project_name) masterSet.add(p.master_project_name);
       }
       
       const masters = [...masterSet].sort();
-      console.log(`[getOwnerExplorer] master_projects | zone: ${zone} | admin: ${userIsAdmin} | count: ${masters.length}`);
+      console.log(`[getOwnerExplorer] master_projects | zone: ${zone} | count: ${masters.length}`);
       return Response.json({ master_projects: masters });
     }
 
-    // ── Action: list buildings for a master project (from owners only + normalized) ─
+    // ── Action: list buildings (projects) for a master project ────────────────────
     if (action === 'projects') {
       if (!master_project) return Response.json({ error: 'master_project required' }, { status: 400 });
-      // EMERGENCY: Fetch only top 50 owners with LEAN columns for speed
-      const { data: allOwners } = await agentDb.from('raco_owner_intelligence').select('linked_projects, owner_area, linked_master_project_names').limit(50);
-      const projectMap = new Map(); // normalized → { name, has_excel, variants }
       
-      for (const owner of (allOwners || [])) {
-        // Check if owner belongs to this master project
-        let belongs = false;
-        if (Array.isArray(owner.linked_master_project_names) && owner.linked_master_project_names.includes(master_project)) {
-          belongs = true;
-        }
-        if (!belongs) continue;
+      const { data: projects, error } = await agentDb
+        .from('raco_project_intelligence')
+        .select('project, master_project_name')
+        .eq('master_project_name', master_project)
+        .limit(1000);
+      
+      if (error || !projects) return Response.json({ projects: [] });
+      
+      const projectMap = new Map(); // normalized → { name, has_excel }
+      
+      for (const p of projects) {
+        if (!p.project) continue;
+        const normalized = normalizeProject(p.project);
         
-        // Add owner's project (normalize it)
-        if (owner.owner_area) {
-          const normalized = normalizeProject(owner.owner_area);
-          if (!projectMap.has(normalized)) {
-            const slug = projectToSlug(normalized);
-            const hasExcel = excelTableSet.has(slug) || allExcelTables.some(t => t.includes(slug.replace('excel_', '')));
-            projectMap.set(normalized, { name: normalized, has_excel: hasExcel, variants: new Set() });
-          }
-          projectMap.get(normalized).variants.add(owner.owner_area);
-        }
-        
-        // Add linked projects
-        if (Array.isArray(owner.linked_projects)) {
-          for (const proj of owner.linked_projects) {
-            if (!proj) continue;
-            const normalized = normalizeProject(proj);
-            if (!projectMap.has(normalized)) {
-              const slug = projectToSlug(normalized);
-              const hasExcel = excelTableSet.has(slug) || allExcelTables.some(t => t.includes(slug.replace('excel_', '')));
-              projectMap.set(normalized, { name: normalized, has_excel: hasExcel, variants: new Set() });
-            }
-            projectMap.get(normalized).variants.add(proj);
-          }
+        if (!projectMap.has(normalized)) {
+          const slug = projectToSlug(normalized);
+          const hasExcel = excelTableSet.has(slug) || allExcelTables.some(t => t.includes(slug.replace('excel_', '')));
+          projectMap.set(normalized, { name: normalized, has_excel: hasExcel });
         }
       }
       
-      const projects = [...projectMap.values()].sort((a, b) => a.name.localeCompare(b.name));
-      return Response.json({ projects });
+      const projectList = [...projectMap.values()].sort((a, b) => a.name.localeCompare(b.name));
+      console.log(`[getOwnerExplorer] projects | master: ${master_project} | count: ${projectList.length}`);
+      return Response.json({ projects: projectList });
     }
 
-    // ── Action: owners by project — fetch top 50 with LEAN columns ──
+    // ── Action: owners by project — show first 100 owners ─────────────────────────
     if (action === 'owners_by_project') {
       if (!project) return Response.json({ error: 'project required' }, { status: 400 });
       
-      // Normalize input and find all variants
       const normalized = normalizeProject(project);
-      const variants = new Set([project]); // Start with input (could be normalized or raw)
-      variants.add(normalized); // Add normalized version
+      const variants = new Set([project, normalized]);
       
       // Add all mappings that normalize to this value
       for (const [k, v] of Object.entries(PROJECT_NORMALIZATIONS)) {
@@ -326,16 +228,14 @@ Deno.serve(async (req) => {
       
       console.log(`[owners_by_project] Looking for: ${normalized} | variants: ${[...variants].join(', ')}`);
 
-      // EMERGENCY: Fetch only TOP 50 owners per variant with LEAN columns
-      // Use id, owner_name, owner_area, search_text only (no portfolios, no heavy joins)
-      const LEAN_COLS = 'id, owner_id, owner_name, email, mobile, owner_area, source_system';
+      // Fetch first 100 owners per variant from master DB
       const masterOwners = [];
       for (const variant of variants) {
         const { data, error } = await agentDb
           .from('raco_owner_intelligence')
-          .select(LEAN_COLS)
+          .select(SUMMARY_COLS)
           .eq('owner_area', variant)
-          .limit(50);
+          .limit(100);
         if (!error && data) {
           masterOwners.push(...data.map(o => ({ ...o, source_label: 'Master DB', source_system: 'master_db' })));
         }
@@ -421,35 +321,15 @@ Deno.serve(async (req) => {
         merged.set(o.id, { ...o, source_label: 'Master DB', source_system: 'master_db' });
       }
 
-      // 2. Search Excel tables — smart routing:
-      // - If query matches a table slug (area-based search), only scan those tables
-      // - For name/phone searches, scan a curated "priority" set of the most important tables
-      //   (the _special_2025 tables + large known tables), capped at 20 for speed
+      // 2. Search Excel tables (sample key tables for speed)
       const qSlug = q.replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
-      const areaMatchingTables = allExcelTables.filter(t =>
-        t.replace(/^excel_/, '').includes(qSlug)
-      );
+      const keyTables = allExcelTables.filter(t =>
+        t.includes('_special_2025') || t.includes('business_bay') || t.includes('marina') || t.includes('downtown')
+      ).slice(0, 15);
 
-      // Priority tables: special_2025 datasets are the most relevant new data
-      const specialTables = allExcelTables.filter(t => t.includes('_special_2025') || t.includes('_2025'));
-      const largeTables = allExcelTables.filter(t =>
-        ['excel_business_bay', 'excel_downtown_dubai', 'excel_palm_jumeirah', 'excel_marina',
-         'excel_jvc', 'excel_al_furjan', 'excel_bluewaters', 'excel_city_walk',
-         'excel_damac_hills', 'excel_arabian_ranches'].some(k => t.startsWith(k))
-      );
-
-      const tablesToSearch = areaMatchingTables.length > 0
-        ? areaMatchingTables.slice(0, 15)
-        : [...new Set([...specialTables, ...largeTables])].slice(0, 20);
-
-      // Search all selected tables in parallel
-      const batchResults = await Promise.all(tablesToSearch.map(async (tbl) => {
-        const [byName, byMob] = await Promise.all([
-          agentDb.from(tbl).select('*').ilike('name', `%${q}%`).limit(8),
-          agentDb.from(tbl).select('*').ilike('mobile', `%${q}%`).limit(5),
-        ]);
-        const combined = [...(byName.data || []), ...(byMob.data || [])];
-        return combined.map(row => normalizeExcelRow(row, tbl));
+      const batchResults = await Promise.all(keyTables.map(async (tbl) => {
+        const { data: byName } = await agentDb.from(tbl).select('*').ilike('name', `%${q}%`).limit(10);
+        return (byName || []).map(row => normalizeExcelRow(row, tbl));
       }));
 
       for (const rows of batchResults) {

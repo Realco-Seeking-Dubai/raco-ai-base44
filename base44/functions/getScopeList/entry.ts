@@ -63,10 +63,9 @@ Deno.serve(async (req) => {
     const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const agent = createClient(SUPABASE_URL, SERVICE_KEY, { db: { schema: 'agent' } });
 
-    // EMERGENCY OPTIMIZATION: Skip directory scan, fetch only top 500 projects from intelligence
-    // This eliminates the slow full-table directory scan
+    // Fetch projects with simple limit
     const [intelligenceRes, excelTables] = await Promise.all([
-      agent.from('raco_project_intelligence').select('final_zone_name, master_project_name, project').limit(500),
+      agent.from('raco_project_intelligence').select('final_zone_name, master_project_name, project').limit(1000),
       discoverExcelTables(SUPABASE_URL, SERVICE_KEY),
     ]);
 
@@ -132,7 +131,7 @@ Deno.serve(async (req) => {
       .map(zone => ({ zone }))
       .sort((a, b) => a.zone.localeCompare(b.zone));
 
-    console.log(`[getScopeList] EMERGENCY OPTIMIZED — zones: ${zones.length} | masters: ${masterProjects.length} | projects: ${projects.length}`);
+    console.log(`[getScopeList] zones: ${zones.length} | masters: ${masterProjects.length} | projects: ${projects.length}`);
 
     return Response.json({
       zones,

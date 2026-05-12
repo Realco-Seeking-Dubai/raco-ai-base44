@@ -72,16 +72,12 @@ export default function Owners() {
       .then(res => res.data);
   }
 
-  // ── Load on mount: show UI instantly, fetch zones async ─────────────────
+  // ── Load on mount ───────────────────────────────────────────────────────
   useEffect(() => {
-    // Return empty state immediately (UI renders in <50ms)
-    setZones([]);
-    setLoading(false);
-    
-    // Fetch zones async in background
+    setLoading(true);
     invoke('zones')
       .then(d => setZones(d?.zones || []))
-      .catch(() => setZones([]));
+      .finally(() => setLoading(false));
   }, [lensUser]);
 
   // ── Navigation handlers ──────────────────────────────────────────────────
@@ -229,11 +225,7 @@ export default function Owners() {
           <OwnerBreadcrumbs crumbs={crumbs} onNavigate={handleBreadcrumb} />
 
           {/* Explorer */}
-          {step === 'zones' && zones.length === 0 && !loading ? (
-            <div className="col-span-full text-sm text-muted-foreground py-8 text-center">
-              Search above or select a zone to browse owners
-            </div>
-          ) : loading ? (
+          {loading ? (
             <GridSkeleton n={6} />
           ) : step === 'zones' ? (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
