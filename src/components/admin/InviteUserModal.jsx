@@ -1,49 +1,48 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
-import { X, UserPlus, Loader2, CheckCircle2, ChevronDown, Search, ChevronRight } from 'lucide-react';
+import { X, UserPlus, Loader2, CheckCircle2, ChevronRight, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const ROLES = ['user', 'admin', 'sales_agent', 'sales_manager', 'listing_admin', 'compliance_officer'];
 
 const TIER_META = {
   zones:          { label: 'Zone',           color: 'bg-sky-tint text-sky border-sky/30' },
-  masterProjects: { label: 'Master Project', color: 'bg-brass-tint text-brass border-brass/30' },
+  masterProjects: { label: 'Community',      color: 'bg-brass-tint text-brass border-brass/30' },
   projects:       { label: 'Building',       color: 'bg-evergreen-tint text-evergreen border-evergreen/30' },
 };
 
-// ─── Small tag chip ──────────────────────────────────────────────────────────
+// ── Tag chip ─────────────────────────────────────────────────────────────────
 function ScopeTag({ label, tier, onRemove }) {
   const { color, label: tierLabel } = TIER_META[tier] || TIER_META.projects;
   return (
     <span className={cn('inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border font-medium', color)}>
-      <span className="opacity-60 text-[9px] uppercase tracking-wide">{tierLabel}</span>
+      <span className="opacity-50 text-[9px] uppercase tracking-wide">{tierLabel}</span>
       {label}
       <button type="button" onClick={onRemove} className="opacity-60 hover:opacity-100 ml-0.5 leading-none">×</button>
     </span>
   );
 }
 
-// ─── Virtual scrolling list: only renders visible rows ───────────────────────
-const ROW_H = 32; // px per row
-const VISIBLE = 10; // rows visible at once
+// ── Virtual list — renders only visible rows for perf ────────────────────────
+const ROW_H = 32;
+const VISIBLE_ROWS = 9;
+
 function VirtualList({ items, selected, onToggle }) {
   const [scrollTop, setScrollTop] = useState(0);
-  const containerH = VISIBLE * ROW_H;
+  const containerH = Math.min(items.length, VISIBLE_ROWS) * ROW_H;
   const totalH = items.length * ROW_H;
   const startIdx = Math.max(0, Math.floor(scrollTop / ROW_H) - 2);
-  const endIdx = Math.min(items.length - 1, startIdx + VISIBLE + 4);
-  const visible = items.slice(startIdx, endIdx + 1);
+  const endIdx = Math.min(items.length - 1, startIdx + VISIBLE_ROWS + 4);
 
   return (
     <div
       style={{ height: containerH, overflowY: 'auto' }}
       onScroll={e => setScrollTop(e.currentTarget.scrollTop)}
-      className="relative"
     >
       <div style={{ height: totalH, position: 'relative' }}>
-        {visible.map((item, i) => {
+        {items.slice(startIdx, endIdx + 1).map((item, i) => {
           const absIdx = startIdx + i;
-          const isSelected = selected.has(item.key);
+          const isSel = selected.has(item.key);
           return (
             <button
               key={item.key}
@@ -51,15 +50,15 @@ function VirtualList({ items, selected, onToggle }) {
               onClick={() => onToggle(item.key, item.label)}
               style={{ position: 'absolute', top: absIdx * ROW_H, height: ROW_H, left: 0, right: 0 }}
               className={cn(
-                'flex items-center gap-2 px-2 text-xs text-left transition-colors w-full',
-                isSelected ? 'bg-evergreen/10 text-evergreen font-medium' : 'hover:bg-surface text-foreground'
+                'flex items-center gap-2 px-3 text-xs text-left w-full transition-colors',
+                isSel ? 'bg-evergreen/10 text-evergreen font-medium' : 'hover:bg-surface text-foreground'
               )}
             >
               <span className={cn(
                 'w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0',
-                isSelected ? 'bg-evergreen border-evergreen' : 'border-hairline-strong'
+                isSel ? 'bg-evergreen border-evergreen' : 'border-hairline-strong'
               )}>
-                {isSelected && <span className="text-white text-[8px] font-bold">✓</span>}
+                {isSel && <span className="text-white text-[8px] font-bold">✓</span>}
               </span>
               <span className="truncate">{item.label}</span>
             </button>
@@ -70,11 +69,8 @@ function VirtualList({ items, selected, onToggle }) {
   );
 }
 
-// ─── Cascading tier panel ────────────────────────────────────────────────────
-function CascadingPanel({
-  title, hint, items, selected, onToggle,
-  searchPlaceholder, exampleHint,
-}) {
+// ── Collapsible tier panel ────────────────────────────────────────────────────
+function TierPanel({ step, title, subtitle, items, selected, onToggle, searchPlaceholder, exampleHint, locked }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const inputRef = useRef(null);
@@ -88,34 +84,40 @@ function CascadingPanel({
   const selCount = items.filter(it => selected.has(it.key)).length;
 
   useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 50);
+    if (open) setTimeout(() => inputRef.current?.focus(), 60);
   }, [open]);
 
+  // Reset search when items list changes (cascade changed)
+  useEffect(() => { setSearch(''); }, [items]);
+
   return (
-    <div className="border border-hairline rounded-lg overflow-hidden">
+    <div className={cn('border rounded-lg overflow-hidden transition-colors', locked ? 'border-hairline opacity-50 pointer-events-none' : 'border-hairline')}>
       <button
         type="button"
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-3 py-2.5 bg-surface hover:bg-surface-2 transition-colors"
+        onClick={() => !locked && setOpen(o => !o)}
+        className="w-full flex items-center gap-3 px-3 py-2.5 bg-surface hover:bg-surface-2 transition-colors text-left"
       >
-        <div className="flex items-center gap-2">
-          <ChevronRight className={cn('w-3.5 h-3.5 text-muted-foreground transition-transform', open && 'rotate-90')} />
-          <span className="text-sm font-medium text-foreground">{title}</span>
-          {hint && <span className="text-xs text-muted-foreground">— {hint}</span>}
-          {selCount > 0 && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-evergreen text-white font-semibold">{selCount}</span>
-          )}
+        <span className="w-5 h-5 rounded-full bg-evergreen/10 text-evergreen text-[10px] font-bold flex items-center justify-center shrink-0">{step}</span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-foreground">{title}</span>
+            {selCount > 0 && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-evergreen text-white font-semibold">{selCount} selected</span>
+            )}
+          </div>
+          {subtitle && <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{subtitle}</p>}
         </div>
-        {items.length > 0 && (
-          <span className="text-[10px] text-muted-2">{items.length} options</span>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {items.length > 0 && <span className="text-[10px] text-muted-2">{items.length}</span>}
+          <ChevronRight className={cn('w-3.5 h-3.5 text-muted-foreground transition-transform', open && 'rotate-90')} />
+        </div>
       </button>
 
-      {open && (
+      {open && !locked && (
         <div className="border-t border-hairline bg-card">
           {items.length === 0 ? (
-            <p className="text-xs text-muted-foreground text-center py-4 px-3">
-              {hint?.includes('select a Zone') ? '← Select a Zone first' : 'No options available'}
+            <p className="text-xs text-muted-foreground text-center py-5">
+              {locked ? 'Select a higher tier first' : 'No options available'}
             </p>
           ) : (
             <>
@@ -134,7 +136,7 @@ function CascadingPanel({
                   <p className="text-[10px] text-muted-2 pl-1">e.g. {exampleHint}</p>
                 )}
               </div>
-              <div className="px-2 pb-2">
+              <div className="px-1 pb-2">
                 {filtered.length === 0 ? (
                   <p className="text-xs text-muted-foreground text-center py-3">No results for "{search}"</p>
                 ) : (
@@ -149,20 +151,22 @@ function CascadingPanel({
   );
 }
 
-// ─── Main modal ──────────────────────────────────────────────────────────────
+// ── Main modal ────────────────────────────────────────────────────────────────
 export default function InviteUserModal({ onClose, onInvited }) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('user');
+
+  // Raw data from backend — 3-tier hierarchy
   const [scopeData, setScopeData] = useState({ zones: [], masterProjects: [], projects: [] });
   const [loadingScope, setLoadingScope] = useState(true);
   const [scopeError, setScopeError] = useState('');
 
-  // selected: Map<key, { label, tier }>
+  // selections: Map<key, { label, tier }>
   const [selections, setSelections] = useState(new Map());
 
-  // Cascading state: which zone / masterProject is active for filtering
-  const [activeZone, setActiveZone] = useState(null);
-  const [activeMaster, setActiveMaster] = useState(null);
+  // Active cascade filters
+  const [activeZone, setActiveZone] = useState(null);       // final_zone_name value
+  const [activeMaster, setActiveMaster] = useState(null);   // master_project_name value
 
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
@@ -177,7 +181,7 @@ export default function InviteUserModal({ onClose, onInvited }) {
           masterProjects: d.masterProjects || [],
           projects: d.projects || [],
         });
-        if (!d.zones?.length && !d.masterProjects?.length && !d.projects?.length) {
+        if (!d.zones?.length && !d.masterProjects?.length) {
           setScopeError('No scope data returned.');
         }
       })
@@ -185,12 +189,13 @@ export default function InviteUserModal({ onClose, onInvited }) {
       .finally(() => setLoadingScope(false));
   }, []);
 
-  // ── Derived tier items ─────────────────────────────────────────────────────
+  // ── Derived tier items ──────────────────────────────────────────────────────
   const zoneItems = useMemo(() =>
     scopeData.zones.map(z => ({ key: z.zone, label: z.zone })),
     [scopeData.zones]
   );
 
+  // Tier 2: master projects filtered by selected zone
   const masterItems = useMemo(() => {
     const list = activeZone
       ? scopeData.masterProjects.filter(m => m.zone === activeZone)
@@ -198,16 +203,18 @@ export default function InviteUserModal({ onClose, onInvited }) {
     return list.map(m => ({ key: m.project_name, label: m.project_name }));
   }, [scopeData.masterProjects, activeZone]);
 
+  // Tier 3: buildings (project column) filtered by selected master project
   const buildingItems = useMemo(() => {
-    const list = activeMaster
-      ? scopeData.projects.filter(p => p.master_project_name === activeMaster || p.zone === activeZone)
-      : activeZone
-        ? scopeData.projects.filter(p => p.zone === activeZone)
-        : scopeData.projects;
-    return list.map(p => ({ key: p.master_project_name, label: p.master_project_name }));
+    let list = scopeData.projects;
+    if (activeMaster) {
+      list = list.filter(p => p.master_project_name === activeMaster);
+    } else if (activeZone) {
+      list = list.filter(p => p.zone === activeZone);
+    }
+    return list.map(p => ({ key: `${p.master_project_name}::${p.project}`, label: p.project }));
   }, [scopeData.projects, activeZone, activeMaster]);
 
-  // ── Selection helpers ──────────────────────────────────────────────────────
+  // ── Selection helpers ───────────────────────────────────────────────────────
   const selectedKeys = useMemo(() => new Set(selections.keys()), [selections]);
 
   function toggle(key, label, tier) {
@@ -219,19 +226,22 @@ export default function InviteUserModal({ onClose, onInvited }) {
     });
   }
 
-  function toggleZone(key, label) {
-    // Selecting a zone also sets the cascade filter
-    setActiveZone(prev => prev === key ? null : key);
+  function handleZoneToggle(key, label) {
+    // Toggle the cascade filter — clicking same zone again clears it
+    setActiveZone(prev => {
+      const next = prev === key ? null : key;
+      return next;
+    });
     setActiveMaster(null);
     toggle(key, label, 'zones');
   }
 
-  function toggleMaster(key, label) {
+  function handleMasterToggle(key, label) {
     setActiveMaster(prev => prev === key ? null : key);
     toggle(key, label, 'masterProjects');
   }
 
-  function toggleBuilding(key, label) {
+  function handleBuildingToggle(key, label) {
     toggle(key, label, 'projects');
   }
 
@@ -240,10 +250,12 @@ export default function InviteUserModal({ onClose, onInvited }) {
   }
 
   function getByTier(tier) {
-    return [...selections.entries()].filter(([, v]) => v.tier === tier).map(([k]) => k);
+    return [...selections.entries()]
+      .filter(([, v]) => v.tier === tier)
+      .map(([k]) => tier === 'projects' ? k.split('::')[1] : k); // strip master prefix for buildings
   }
 
-  // ── Submit ─────────────────────────────────────────────────────────────────
+  // ── Submit ──────────────────────────────────────────────────────────────────
   async function handleInvite() {
     if (!email.trim()) { setError('Email is required.'); return; }
     if (selections.size === 0) { setError('Please assign at least one scope.'); return; }
@@ -267,7 +279,7 @@ export default function InviteUserModal({ onClose, onInvited }) {
     }
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
       <div
@@ -317,17 +329,25 @@ export default function InviteUserModal({ onClose, onInvited }) {
                   >
                     {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
-                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                  <ChevronRight className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none rotate-90" />
                 </div>
               </div>
 
               {/* Scope */}
               <div>
-                <label className="block text-xs font-medium text-foreground mb-1">
-                  Assign Scope <span className="text-terracotta">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-foreground">
+                    Assign Scope <span className="text-terracotta">*</span>
+                  </label>
+                  {activeZone && (
+                    <span className="text-[10px] text-muted-foreground">
+                      Filtering by: <span className="text-brass font-medium">{activeZone}</span>
+                      {activeMaster && <> → <span className="text-evergreen font-medium">{activeMaster}</span></>}
+                    </span>
+                  )}
+                </div>
                 <p className="text-[11px] text-muted-foreground mb-2">
-                  Drill down: Zone → Master Project → Building. Selecting a Zone cascades the options below.
+                  Drill down Zone → Community → Building. Selections at any level are saved independently.
                 </p>
 
                 {loadingScope ? (
@@ -338,36 +358,44 @@ export default function InviteUserModal({ onClose, onInvited }) {
                   <p className="text-xs text-terracotta">{scopeError}</p>
                 ) : (
                   <div className="space-y-2">
-                    {/* Tier 1: Zones */}
-                    <CascadingPanel
-                      title="1. Zone"
-                      hint={activeZone ? `Filtering by: ${activeZone}` : 'select a zone to cascade'}
+                    <TierPanel
+                      step="1"
+                      title="Zone"
+                      subtitle={activeZone ? `Active: ${activeZone}` : `${zoneItems.length} zones available`}
                       items={zoneItems}
                       selected={selectedKeys}
-                      onToggle={toggleZone}
+                      onToggle={handleZoneToggle}
                       searchPlaceholder="Search zones…"
                       exampleHint="Core, Suburbs, Waterfront"
                     />
-
-                    {/* Tier 2: Master Projects */}
-                    <CascadingPanel
-                      title="2. Master Project / Community"
-                      hint={activeZone ? `${masterItems.length} in ${activeZone}` : 'select a Zone first to filter'}
+                    <TierPanel
+                      step="2"
+                      title="Master Project / Community"
+                      subtitle={
+                        activeZone
+                          ? `${masterItems.length} communities in ${activeZone}`
+                          : 'Select a Zone to filter'
+                      }
                       items={masterItems}
                       selected={selectedKeys}
-                      onToggle={toggleMaster}
-                      searchPlaceholder="Search communities…"
-                      exampleHint="Al Furjan, DAMAC Hills, Dubai Marina"
+                      onToggle={handleMasterToggle}
+                      searchPlaceholder="Try Al Furjan, Dubai Marina…"
+                      exampleHint="Al Furjan, DAMAC Hills, Downtown Dubai"
                     />
-
-                    {/* Tier 3: Buildings */}
-                    <CascadingPanel
-                      title="3. Building / Project"
-                      hint={activeMaster ? `inside ${activeMaster}` : activeZone ? `in ${activeZone}` : 'select a Master Project to filter'}
+                    <TierPanel
+                      step="3"
+                      title="Building / Project"
+                      subtitle={
+                        activeMaster
+                          ? `${buildingItems.length} buildings in ${activeMaster}`
+                          : activeZone
+                            ? `${buildingItems.length} buildings in ${activeZone}`
+                            : 'Select a Community to filter'
+                      }
                       items={buildingItems}
                       selected={selectedKeys}
-                      onToggle={toggleBuilding}
-                      searchPlaceholder="Search buildings…"
+                      onToggle={handleBuildingToggle}
+                      searchPlaceholder="Try Murooj Al Furjan…"
                       exampleHint="Murooj Al Furjan, Tilal Al Furjan"
                     />
                   </div>

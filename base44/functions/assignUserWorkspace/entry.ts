@@ -18,8 +18,8 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     );
 
-    // Build rows matching workspace_scope_assignments schema:
-    // columns: user_email, scope_label, zone, master_project_name, project, assigned_by, is_active
+    // workspace_scope_assignments columns:
+    // user_email, scope_label, zone, master_project_name, project, assigned_by, is_active
     const rows = [
       ...zones.map(z => ({
         user_email,
@@ -43,16 +43,14 @@ Deno.serve(async (req) => {
         user_email,
         scope_label: p,
         zone: null,
-        master_project_name: p,
+        master_project_name: null,
         project: p,
         assigned_by: user.email,
         is_active: true,
       })),
     ];
 
-    if (rows.length === 0) {
-      return Response.json({ ok: true, inserted: 0 });
-    }
+    if (rows.length === 0) return Response.json({ ok: true, inserted: 0 });
 
     const { error } = await supabase
       .from('workspace_scope_assignments')

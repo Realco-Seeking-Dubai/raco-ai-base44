@@ -29,58 +29,64 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const pub = createClient(
-      Deno.env.get('SUPABASE_URL'),
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    );
     const agent = createClient(
       Deno.env.get('SUPABASE_URL'),
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
       { db: { schema: 'agent' } }
     );
 
-    // Paginate all three sources in parallel
-    const [scopeRows, projectRows] = await Promise.all([
-      fetchAll(pub, 'v_admin_scope_projects', 'zone, master_project_name, project'),
-      fetchAll(agent, 'raco_project_intelligence', 'master_project_name, area_name, final_zone_name'),
-    ]);
+    // Fetch ALL rows from raco_project_intelligence with the 3 hierarchy columns
+    const rows = await fetchAll(
+      agent,
+      'raco_project_intelligence',
+      'final_zone_name, master_project_name, project'
+    );
 
-    // Extract unique zones
+    // Tier 1: distinct zones
     const zonesSeen = new Set();
     const zones = [];
-    for (const r of scopeRows) {
-      if (r.zone && !zonesSeen.has(r.zone)) {
-        zonesSeen.add(r.zone);
-        zones.push({ zone: r.zone });
+    for (const r of rows) {
+      if (r.final_zone_name && !zonesSeen.has(r.final_zone_name)) {
+        zonesSeen.add(r.final_zone_name);
+        zones.push({ zone: r.final_zone_name });
       }
     }
     zones.sort((a, b) => a.zone.localeCompare(b.zone));
 
-    // Extract unique master projects, grouped by zone
-    const masterSeen = new Set();
+    // Tier 2: distinct master_project_name per zone
+    // Build a map: zone -> Set<master_project_name>
+    const masterByZone = {};
+    for (const r of rows) {
+      if (!r.final_zone_name || !r.master_project_name) continue;
+      if (!masterByZone[r.final_zone_name]) masterByZone[r.final_zone_name] = new Set();
+      masterByZone[r.final_zone_name].add(r.master_project_name);
+    }
+    // Flatten into array with zone context
     const masterProjects = [];
-    for (const r of scopeRows) {
-      if (r.master_project_name && !masterSeen.has(r.master_project_name)) {
-        masterSeen.add(r.master_project_name);
-        masterProjects.push({ project_name: r.master_project_name, zone: r.zone });
+    for (const [zone, names] of Object.entries(masterByZone)) {
+      for (const name of names) {
+        masterProjects.push({ project_name: name, zone });
       }
     }
     masterProjects.sort((a, b) => a.project_name.localeCompare(b.project_name));
 
-    // Extract unique buildings from raco_project_intelligence
-    const buildingSeen = new Set();
+    // Tier 3: distinct project per master_project_name
+    // Build a map: master_project_name -> { zone, projects: Set<project> }
+    const projectByMaster = {};
+    for (const r of rows) {
+      if (!r.master_project_name || !r.project) continue;
+      if (!projectByMaster[r.master_project_name]) {
+        projectByMaster[r.master_project_name] = { zone: r.final_zone_name, projects: new Set() };
+      }
+      projectByMaster[r.master_project_name].projects.add(r.project);
+    }
     const projects = [];
-    for (const r of projectRows) {
-      if (r.master_project_name && !buildingSeen.has(r.master_project_name)) {
-        buildingSeen.add(r.master_project_name);
-        projects.push({
-          master_project_name: r.master_project_name,
-          zone: r.final_zone_name,
-          area: r.area_name,
-        });
+    for (const [master, { zone, projects: pSet }] of Object.entries(projectByMaster)) {
+      for (const proj of pSet) {
+        projects.push({ project: proj, master_project_name: master, zone });
       }
     }
-    projects.sort((a, b) => a.master_project_name.localeCompare(b.master_project_name));
+    projects.sort((a, b) => a.project.localeCompare(b.project));
 
     console.log(`[getScopeList] FINAL — zones: ${zones.length} | masterProjects: ${masterProjects.length} | projects: ${projects.length}`);
     return Response.json({ zones, masterProjects, projects });
