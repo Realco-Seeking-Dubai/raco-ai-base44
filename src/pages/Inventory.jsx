@@ -9,6 +9,7 @@ import InventorySidebar, { BUDGET_RANGES } from '@/components/inventory/Inventor
 import ValuationTool from '@/components/inventory/ValuationTool';
 import PropertyMap from '@/components/map/PropertyMap';
 import ListingsTab from '@/components/inventory/ListingsTab';
+import PocketInventoryTab from '@/components/inventory/PocketInventoryTab';
 import { Building2, Search, Plus, StickyNote, Send, CheckSquare, SlidersHorizontal, Map } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -204,7 +205,7 @@ export default function Inventory() {
       )}
 
       {tab === 'Pocket Inventory' && (
-        <EmptyState icon={Building2} title="No pocket listings" body="Pocket listings managed by you will appear here." />
+        <PocketInventoryTab />
       )}
     </div>
   );
