@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useLens } from '@/lib/LensContext';
-import { getOwnerStatus, getOwners } from '@/lib/supabase';
+import { base44 } from '@/api/base44Client';
 import PageHeader from '@/components/ui/PageHeader';
 import StatusBadge from '@/components/ui/StatusBadge';
 import EmptyState from '@/components/ui/EmptyState';
@@ -32,40 +32,29 @@ export default function Inventory() {
 
   useEffect(() => {
     const queryEmail = lensEmail || user?.email;
-    if (tab !== 'My Areas' || !queryEmail) { setLoading(false); return; }
+    if (tab !== 'My Areas') { setLoading(false); return; }
     setLoading(true);
-    getOwnerStatus(queryEmail)
-      .then(data => {
-        setOwners(data || []);
+    base44.functions.invoke('getOwners', { agent_email: queryEmail || null })
+      .then(res => {
+        setOwners(res.data?.owners || []);
         setLoading(false);
       })
       .catch(err => {
-        console.error('Owner status error:', err);
+        console.error('Owner fetch error:', err);
         setOwners([]);
         setLoading(false);
       });
   }, [tab, user, lensEmail]);
 
   const filteredOwners = owners.filter(o => {
-    const name = o.raco_owners?.full_name || '';
+    const name = o.owner_name || '';
     if (search && !name.toLowerCase().includes(search.toLowerCase())) return false;
-    if (filters.status !== 'All' && o.status?.toLowerCase() !== filters.status.toLowerCase()) return false;
-    // Zone filter (approximate match on area field if available)
-    if (filters.zone !== 'All' && o.zone && !o.zone.toLowerCase().includes(filters.zone.toLowerCase())) return false;
-    // Property type filter
-    if (filters.propertyType !== 'All' && o.property_type && o.property_type.toLowerCase() !== filters.propertyType.toLowerCase()) return false;
-    // Budget filter
-    const budget = Number(o.asking_price) || 0;
-    if (filters.budget.max !== Infinity && budget > filters.budget.max) return false;
-    if (budget > 0 && budget < filters.budget.min) return false;
+    if (filters.zone !== 'All' && o.owner_area && !o.owner_area.toLowerCase().includes(filters.zone.toLowerCase())) return false;
     return true;
   });
 
   const activeFilterCount = [
-    filters.status !== 'All',
-    filters.propertyType !== 'All',
     filters.zone !== 'All',
-    filters.budget?.label !== 'Any',
   ].filter(Boolean).length;
 
   return (
@@ -148,10 +137,10 @@ export default function Inventory() {
                   height={260}
                   markers={filteredOwners.slice(0, 30).map(o => ({
                     id: o.id,
-                    zone: o.zone || 'Al Furjan',
-                    label: o.raco_owners?.full_name || 'Owner',
-                    type: o.status === 'listed' ? 'listing' : o.status === 'responded' ? 'warm' : 'owner',
-                    sub: o.status,
+                    zone: o.owner_area || 'Dubai',
+                    label: o.owner_name || 'Owner',
+                    type: 'owner',
+                    sub: o.source_system,
                   }))}
                 />
               </div>
@@ -168,25 +157,23 @@ export default function Inventory() {
                 <div className="text-xs text-muted-foreground mb-3">{filteredOwners.length} owner{filteredOwners.length !== 1 ? 's' : ''} found</div>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {filteredOwners.map(o => {
-                    const name = o.raco_owners?.full_name || 'Unknown Owner';
-                    const statusKey = o.status || 'new';
                     return (
                       <div key={o.id} className="bg-card border border-hairline rounded-xl p-4 hover:shadow-sm hover:border-hairline-strong transition-all">
                         <div className="flex items-start justify-between gap-2 mb-3">
                           <div>
-                            <div className="text-sm font-medium text-foreground">{name}</div>
-                            <div className="text-xs text-muted-foreground mt-0.5">{o.raco_owners?.email || '—'}</div>
+                            <div className="text-sm font-medium text-foreground">{o.owner_name || 'Unknown Owner'}</div>
+                            <div className="text-xs text-muted-foreground mt-0.5">{o.email || o.mobile || '—'}</div>
                           </div>
-                          <StatusBadge status={statusKey} />
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-surface-2 text-muted-foreground">{o.source_system || '—'}</span>
                         </div>
-                        {o.zone && (
-                          <div className="text-xs text-sky bg-sky-tint rounded px-2 py-0.5 inline-flex mb-2">{o.zone}</div>
+                        {o.owner_area && (
+                          <div className="text-xs text-sky bg-sky-tint rounded px-2 py-0.5 inline-flex mb-2">{o.owner_area}</div>
                         )}
-                        {o.ai_suggestion && (
-                          <div className="text-xs text-muted-foreground bg-brass-tint/50 rounded-lg px-3 py-2 mb-3 border border-brass/20">
-                            <span className="font-medium text-brass">Raco suggests: </span>{o.ai_suggestion}
-                          </div>
-                        )}
+                        <div className="flex gap-2 text-[10px] text-muted-foreground mb-3">
+                          <span>{o.owner_record_count || 0} records</span>
+                          <span>·</span>
+                          <span>{o.linked_project_count || 0} projects</span>
+                        </div>
                         <div className="flex gap-2">
                           <button className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs rounded-lg border border-hairline hover:bg-surface transition-colors text-muted-foreground hover:text-foreground">
                             <StickyNote className="w-3 h-3" /> Note

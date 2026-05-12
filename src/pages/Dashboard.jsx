@@ -1,37 +1,38 @@
 import { useEffect, useState } from 'react';
-import { getPixxiUsers, getActivityTimeline, getAuditLog } from '@/lib/supabase';
+import { base44 } from '@/api/base44Client';
 import PageHeader from '@/components/ui/PageHeader';
 import KpiCard from '@/components/ui/KpiCard';
 import StatusBadge from '@/components/ui/StatusBadge';
 import EmptyState from '@/components/ui/EmptyState';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Users, Activity, Shield, TrendingUp } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { Users, Building2, Shield, TrendingUp } from 'lucide-react';
 
 export default function Dashboard() {
   const [users, setUsers] = useState([]);
-  const [activities, setActivities] = useState([]);
+  const [leadsCount, setLeadsCount] = useState(0);
+  const [ownersCount, setOwnersCount] = useState(0);
   const [auditLog, setAuditLog] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      getPixxiUsers(),
-      getActivityTimeline('').catch(() => []),
-      getAuditLog().catch(() => []),
-    ]).then(([u, a, al]) => {
-      setUsers(u || []);
-      setActivities(a || []);
-      setAuditLog(al || []);
-      setLoading(false);
-    }).catch(err => {
-      console.error('Dashboard data error:', err);
-      setLoading(false);
-    });
+    base44.functions.invoke('getDashboardStats', {})
+      .then(res => {
+        const d = res.data || {};
+        setUsers(d.users || []);
+        setLeadsCount(d.leads_count || 0);
+        setOwnersCount(d.owners_count || 0);
+        setAuditLog(d.audit_log || []);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Dashboard data error:', err);
+        setLoading(false);
+      });
   }, []);
 
   // User activity by role
   const usersByRole = users.reduce((acc, u) => {
-    const role = u.role || 'user';
+    const role = u.lifecycle_status || 'staged';
     const existing = acc.find(x => x.name === role);
     if (existing) existing.value += 1;
     else acc.push({ name: role, value: 1 });
@@ -46,15 +47,6 @@ export default function Dashboard() {
     else acc.push({ name: status, count: 1 });
     return acc;
   }, []);
-
-  // Activity timeline — group by day
-  const activityByDay = activities.reduce((acc, a) => {
-    const date = a.event_at ? new Date(a.event_at).toLocaleDateString('en-GB') : 'Unknown';
-    const existing = acc.find(x => x.date === date);
-    if (existing) existing.count += 1;
-    else acc.push({ date, count: 1 });
-    return acc;
-  }, []).slice(-7); // Last 7 days
 
   // Compliance status
   const complianceStats = {
@@ -76,8 +68,8 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
         <KpiCard label="Total Users" value={users.length} icon={Users} color="evergreen" />
         <KpiCard label="Active Users" value={users.filter(u => u.is_active).length} icon={TrendingUp} color="brass" />
-        <KpiCard label="Compliance Events" value={auditLog.length} icon={Shield} color="sky" />
-        <KpiCard label="Recent Activity" value={activities.length} icon={Activity} color="terracotta" />
+        <KpiCard label="Total Leads" value={leadsCount} icon={Shield} color="sky" />
+        <KpiCard label="Total Owners" value={ownersCount} icon={Building2} color="terracotta" />
       </div>
 
       {loading ? (
@@ -87,20 +79,20 @@ export default function Dashboard() {
         </div>
       ) : (
         <div className="grid lg:grid-cols-2 gap-6 mb-6">
-          {/* User Activity Timeline */}
+          {/* User Lifecycle Distribution */}
           <div className="bg-card border border-hairline rounded-xl p-4">
-            <div className="text-sm font-semibold text-foreground mb-4">User Activity (Last 7 Days)</div>
+            <div className="text-sm font-semibold text-foreground mb-4">User Lifecycle Status</div>
             <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={activityByDay}>
+              <BarChart data={usersByStatus}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--hairline))" />
-                <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} />
+                <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} />
                 <YAxis stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--hairline))' }}
                   labelStyle={{ color: 'hsl(var(--foreground))' }}
                 />
-                <Line type="monotone" dataKey="count" stroke="hsl(var(--evergreen))" strokeWidth={2} dot={{ fill: 'hsl(var(--evergreen))' }} />
-              </LineChart>
+                <Bar dataKey="count" fill="hsl(var(--evergreen))" />
+              </BarChart>
             </ResponsiveContainer>
           </div>
 
@@ -132,20 +124,18 @@ export default function Dashboard() {
 
       {/* User Status & Compliance */}
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* User Lifecycle Status */}
+        {/* Users by Role (Pie) */}
         <div className="bg-card border border-hairline rounded-xl p-4">
-          <div className="text-sm font-semibold text-foreground mb-4">User Lifecycle Status</div>
+          <div className="text-sm font-semibold text-foreground mb-4">Users by Lifecycle</div>
           <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={usersByStatus}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--hairline))" />
-              <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} />
-              <YAxis stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} />
-              <Tooltip 
-                contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--hairline))' }}
-                labelStyle={{ color: 'hsl(var(--foreground))' }}
-              />
-              <Bar dataKey="count" fill="hsl(var(--brass))" />
-            </BarChart>
+            <PieChart>
+              <Pie data={usersByStatus} cx="50%" cy="50%" labelLine={false} label={({ name, value }) => `${name}: ${value}`} outerRadius={80} dataKey="count">
+                {usersByStatus.map((_, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip />
+            </PieChart>
           </ResponsiveContainer>
         </div>
 
