@@ -1,6 +1,9 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
+// Returns true if value looks like a UUID
+const isUUID = (v) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -26,14 +29,41 @@ Deno.serve(async (req) => {
       return Response.json({ error: error.message }, { status: 500 });
     }
 
-    // Map to consistent shape — align user-requested field names
+    // Collect all unique assigned_agent_id values that look like UUIDs
+    const agentIds = [...new Set(
+      (data || [])
+        .map(r => r.assigned_agent_id)
+        .filter(v => v && isUUID(v))
+    )];
+
+    // Build a UUID → display label map by querying pixxi_users (or any users table)
+    const agentMap = {};
+    if (agentIds.length > 0) {
+      // Try public.pixxi_users first, fall back silently
+      const { data: agentRows } = await db
+        .from('pixxi_users')
+        .select('id, pixxi_email, full_name, display_name')
+        .in('id', agentIds);
+
+      (agentRows || []).forEach(a => {
+        agentMap[a.id] = a.display_name || a.full_name || a.pixxi_email || a.id;
+      });
+    }
+
+    // Resolve assigned_agent: if it's a UUID look it up; if it's already an email/name use as-is
+    const resolveAgent = (val) => {
+      if (!val) return null;
+      if (isUUID(val)) return agentMap[val] || val; // UUID → resolved label or fallback to raw UUID
+      return val; // already an email or name
+    };
+
     const units = (data || []).map(row => ({
       id: row.id,
       title: row.title,
-      asking_price_aed: row.price,          // price → asking_price_aed
+      asking_price_aed: row.price,
       community: row.community,
-      assigned_agent: row.assigned_agent_id, // assigned_agent_id → assigned_agent
-      property_category: row.property_type,  // property_type → property_category
+      assigned_agent: resolveAgent(row.assigned_agent_id),
+      property_category: row.property_type,
       status: row.status,
       bedrooms: row.bedrooms,
       size_sqft: row.size_sqft,
@@ -42,7 +72,7 @@ Deno.serve(async (req) => {
       is_exclusive: row.is_exclusive,
     }));
 
-    console.log('[getPocketInventory] Returned', units.length, 'properties');
+    console.log('[getPocketInventory] Returned', units.length, 'properties,', agentIds.length, 'agent IDs resolved');
     return Response.json({ units });
   } catch (err) {
     console.error('[getPocketInventory]', err.message);
