@@ -34,8 +34,8 @@ export function computeLeadScore(lead) {
   else if (daysSince <= 90) score += 3;
 
   // Has contact details (weight: 10)
-  if (lead.contact_email) score += 5;
-  if (lead.contact_phone) score += 5;
+  if (lead.email) score += 5;
+  if (lead.phone) score += 5;
 
   return Math.min(100, score);
 }

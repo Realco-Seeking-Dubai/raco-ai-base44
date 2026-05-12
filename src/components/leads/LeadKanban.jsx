@@ -98,7 +98,7 @@ export default function LeadKanban({ leads, listings, agents, onLeadUpdated }) {
                               )}
                             >
                               <div className="flex items-start justify-between gap-1 mb-1.5">
-                                <div className="text-sm font-medium text-foreground truncate">{lead.contact_name || 'Unknown'}</div>
+                                <div className="text-sm font-medium text-foreground truncate">{lead.name || '—'}</div>
                               </div>
                               <div className="flex flex-wrap gap-1 mb-1.5">
                                 <LeadScoreBadge score={lead._score} showLabel={false} />

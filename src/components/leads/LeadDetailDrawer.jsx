@@ -25,8 +25,8 @@ export default function LeadDetailDrawer({ lead, listings, agents, onClose, onAs
         {/* Header */}
         <div className="sticky top-0 bg-card border-b border-hairline px-5 py-4 flex items-center justify-between z-10">
           <div>
-            <div className="font-semibold text-foreground text-base">{lead.contact_name || 'Unknown Lead'}</div>
-            <div className="text-xs text-muted-foreground mt-0.5">{lead.contact_email || lead.contact_phone || '—'}</div>
+            <div className="font-semibold text-foreground text-base">{lead.name || 'Unknown Lead'}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">{lead.email || lead.phone || '—'}</div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-surface text-muted-foreground hover:text-foreground transition-colors">
             <X className="w-4 h-4" />
@@ -47,18 +47,18 @@ export default function LeadDetailDrawer({ lead, listings, agents, onClose, onAs
 
           {/* Quick Actions */}
           <div className="flex gap-2">
-            {lead.contact_phone && (
-              <a href={`tel:${lead.contact_phone}`} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium rounded-lg border border-hairline hover:bg-surface transition-colors">
+            {lead.phone && (
+              <a href={`tel:${lead.phone}`} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium rounded-lg border border-hairline hover:bg-surface transition-colors">
                 <Phone className="w-3.5 h-3.5 text-evergreen" /> Call
               </a>
             )}
-            {lead.contact_email && (
-              <a href={`mailto:${lead.contact_email}`} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium rounded-lg border border-hairline hover:bg-surface transition-colors">
+            {lead.email && (
+              <a href={`mailto:${lead.email}`} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium rounded-lg border border-hairline hover:bg-surface transition-colors">
                 <Mail className="w-3.5 h-3.5 text-sky" /> Email
               </a>
             )}
-            {lead.contact_phone && (
-              <a href={`https://wa.me/${lead.contact_phone?.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium rounded-lg border border-hairline hover:bg-surface transition-colors">
+            {lead.phone && (
+              <a href={`https://wa.me/${lead.phone?.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium rounded-lg border border-hairline hover:bg-surface transition-colors">
                 <MessageCircle className="w-3.5 h-3.5 text-brass" /> WhatsApp
               </a>
             )}

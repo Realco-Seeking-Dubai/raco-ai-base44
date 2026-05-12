@@ -73,9 +73,9 @@ export default function Leads() {
 
   const filtered = leads.filter(l => {
     const matchSearch = !search ||
-      l.contact_name?.toLowerCase().includes(search.toLowerCase()) ||
-      l.contact_email?.toLowerCase().includes(search.toLowerCase()) ||
-      l.zone?.toLowerCase().includes(search.toLowerCase());
+      l.name?.toLowerCase().includes(search.toLowerCase()) ||
+      l.email?.toLowerCase().includes(search.toLowerCase()) ||
+      l.region?.toLowerCase().includes(search.toLowerCase());
     const matchScore = scoreFilter === 'All' || getScoreTier(l._score) === scoreFilter.toLowerCase();
     const matchSource = sourceFilter === 'All' || l.source?.toLowerCase() === sourceFilter.toLowerCase();
     return matchSearch && matchScore && matchSource;
@@ -219,7 +219,7 @@ export default function Leads() {
                       onClick={() => setSelectedLead(lead)}
                       className={cn('hover:bg-surface transition-colors cursor-pointer', getScoreTier(lead._score) === 'hot' && 'bg-terracotta-tint/20')}
                     >
-                      <td className="px-4 py-3 font-medium text-foreground">{lead.contact_name || '—'}</td>
+                      <td className="px-4 py-3 font-medium text-foreground">{lead.name || '—'}</td>
                       <td className="px-4 py-3"><LeadScoreBadge score={lead._score} /></td>
                       <td className="px-4 py-3 hidden sm:table-cell">
                         {lead.source && (
