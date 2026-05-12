@@ -33,6 +33,7 @@ const NAV = [
     group: 'Property',
     items: [
       { label: 'Inventory & Sellers', path: '/inventory', icon: Building2 },
+      { label: 'Owner Database', path: '/owners', icon: Users },
       { label: 'Zones & Projects', path: '/zones', icon: MapPin },
       { label: 'Deals', path: '/deals', icon: BarChart3 },
     ],

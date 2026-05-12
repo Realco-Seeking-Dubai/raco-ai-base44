@@ -23,6 +23,7 @@ import Compliance from '@/pages/Compliance';
 import Admin from '@/pages/Admin';
 import Agents from '@/pages/Agents';
 import Dashboard from '@/pages/Dashboard';
+import Owners from '@/pages/Owners';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -53,6 +54,7 @@ const AuthenticatedApp = () => {
         <Route path="/contacts" element={<Contacts />} />
         <Route path="/leads" element={<Leads />} />
         <Route path="/inventory" element={<Inventory />} />
+        <Route path="/owners" element={<Owners />} />
         <Route path="/zones" element={<Zones />} />
         <Route path="/deals" element={<Deals />} />
         <Route path="/market" element={<Market />} />

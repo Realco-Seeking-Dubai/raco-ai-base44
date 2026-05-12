@@ -7,13 +7,17 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const agentDb = createClient(
+    const supabase = createClient(
       Deno.env.get('SUPABASE_URL'),
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
-      { db: { schema: 'agent' } }
+      {
+        global: {
+          headers: { 'Accept-Profile': 'agent', 'Content-Profile': 'agent' }
+        }
+      }
     );
 
-    const { data, error } = await agentDb
+    const { data, error } = await supabase
       .from('raco_project_intelligence')
       .select('master_project_name, zone, area')
       .not('master_project_name', 'is', null)
