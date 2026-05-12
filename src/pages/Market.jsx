@@ -1,30 +1,32 @@
 import { useEffect, useState } from 'react';
-import { getMarketSummary } from '@/lib/supabase';
+import { base44 } from '@/api/base44Client';
 import PageHeader from '@/components/ui/PageHeader';
 import KpiCard from '@/components/ui/KpiCard';
 import EmptyState from '@/components/ui/EmptyState';
 import { BarChart3, TrendingUp, RefreshCw, ArrowUp, ArrowDown } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
-
-
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function Market() {
-  const [summary, setSummary] = useState([]);
+  const [insights, setInsights] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [lastRefresh] = useState(new Date());
+  const [lastRefresh, setLastRefresh] = useState(new Date());
 
-  useEffect(() => {
-    getMarketSummary()
-      .then(data => {
-        setSummary(data || []);
+  function loadData() {
+    setLoading(true);
+    base44.functions.invoke('getMarketInsights', {})
+      .then(res => {
+        setInsights(res?.data?.insights || []);
+        setLastRefresh(new Date());
         setLoading(false);
       })
       .catch(err => {
         console.error('Market data error:', err);
-        setSummary([]);
+        setInsights([]);
         setLoading(false);
       });
-  }, []);
+  }
+
+  useEffect(() => { loadData(); }, []);
 
   return (
     <div className="p-6 animate-fade-in">
@@ -32,9 +34,13 @@ export default function Market() {
         title="Market Insights"
         subtitle="DLD transaction intelligence"
         actions={
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <RefreshCw className="w-3 h-3" />
-            Last updated {lastRefresh.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">
+              Updated {lastRefresh.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+            <button onClick={loadData} className="p-1.5 rounded-lg border border-hairline bg-card text-muted-foreground hover:text-foreground hover:bg-surface transition-colors">
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
           </div>
         }
       />
@@ -43,81 +49,74 @@ export default function Market() {
         <div className="flex gap-3 overflow-x-auto pb-4">
           {[1, 2, 3, 4, 5].map(i => <div key={i} className="w-64 shrink-0 h-48 bg-surface rounded-xl animate-pulse" />)}
         </div>
-      ) : summary.length === 0 ? (
+      ) : insights.length === 0 ? (
         <EmptyState icon={BarChart3} title="No market data yet" />
       ) : (
         <>
           {/* KPIs */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-            <KpiCard label="Total Transactions" value={`${(summary.reduce((s, z) => s + (z.transactions || 0), 0) / 1e6).toFixed(2)}M`} icon={BarChart3} color="evergreen" />
-            <KpiCard label="Zones" value={summary.length} icon={TrendingUp} color="brass" />
-            <KpiCard label="Avg. Price" value={`AED ${(summary.reduce((s, z) => s + (z.avg_price_m || 0), 0) / summary.length).toFixed(1)}M`} icon={BarChart3} color="sky" />
-            <KpiCard label="Positive Zones" value={summary.filter(z => (z.deviation || 0) >= 0).length} icon={TrendingUp} color="terracotta" />
+            <KpiCard label="Projects" value={insights.length} icon={BarChart3} color="evergreen" />
+            <KpiCard label="Total Units" value={insights.reduce((s, p) => s + (p.total_units || 0), 0).toLocaleString()} icon={TrendingUp} color="brass" />
+            <KpiCard label="With Transactions" value={insights.filter(p => p.total_transactions > 0).length} icon={BarChart3} color="sky" />
+            <KpiCard label="High Confidence" value={insights.filter(p => p.mapping_confidence === 'HIGH').length} icon={TrendingUp} color="terracotta" />
           </div>
 
-          {/* Pulse vs Sentiment */}
+          {/* Project cards */}
           <div className="mb-6">
-            <h3 className="text-sm font-semibold text-foreground mb-3">Pulse vs Sentiment by Zone</h3>
+            <h3 className="text-sm font-semibold text-foreground mb-3">Projects by Zone</h3>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {summary.map(z => {
-            const dev = z.deviation || 0;
-            const isPos = dev >= 0;
+              {insights.map(p => (
+                <div key={p.id} className="bg-card border border-hairline rounded-xl p-4 hover:shadow-sm transition-all">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="text-sm font-medium text-foreground truncate pr-2">{p.project}</div>
+                    <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold ${p.mapping_confidence === 'HIGH' ? 'bg-evergreen-tint text-evergreen' : 'bg-brass-tint text-brass'}`}>
+                      {p.mapping_confidence}
+                    </span>
+                  </div>
+                  <div className="text-xs text-muted-foreground mb-3">{p.area_name} · {p.final_zone_name}</div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">{p.property_category || '—'}</span>
+                    <span className="font-mono text-foreground">{(p.total_units || 0).toLocaleString()} units</span>
+                  </div>
+                  {p.total_transactions > 0 && (
+                    <div className="mt-2 pt-2 border-t border-hairline flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Transactions</span>
+                      <span className="font-mono font-semibold text-evergreen">{p.total_transactions.toLocaleString()}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Volume chart — zones with transactions */}
+          {(() => {
+            const zoneData = Object.entries(
+              insights.reduce((acc, p) => {
+                const zone = p.final_zone_name || 'Other';
+                acc[zone] = (acc[zone] || 0) + (p.total_units || 0);
+                return acc;
+              }, {})
+            ).map(([zone, units]) => ({ zone, units })).sort((a, b) => b.units - a.units).slice(0, 12);
             return (
-              <div key={z.zone} className="bg-card border border-hairline rounded-xl p-4 hover:shadow-sm transition-all">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="text-sm font-medium text-foreground">{z.zone}</div>
-                  <div className={`flex items-center gap-1 text-xs font-semibold ${isPos ? 'text-evergreen' : 'text-terracotta'}`}>
-                    {isPos ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
-                    {Math.abs(dev).toFixed(1)}%
-                  </div>
-                </div>
-                {/* Bars */}
-                <div className="space-y-2">
-                  <div>
-                    <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                      <span>Real prices</span>
-                      <span className="font-mono">AED {z.avg_price_m}M</span>
-                    </div>
-                    <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
-                      <div className="h-full bg-evergreen rounded-full" style={{ width: `${Math.min((z.avg_price_m / 8) * 100, 100)}%` }} />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                      <span>Asking prices</span>
-                      <span className="font-mono">AED {(z.avg_price_m * (1 + dev / 100)).toFixed(1)}M</span>
-                    </div>
-                    <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
-                      <div className="h-full bg-brass rounded-full" style={{ width: `${Math.min(((z.avg_price_m * (1 + dev / 100)) / 8) * 100, 100)}%` }} />
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-3 text-xs text-muted-2">
-                  {z.transactions?.toLocaleString() || '—'} transactions
-                </div>
+              <div className="bg-card border border-hairline rounded-xl p-4">
+                <h3 className="text-sm font-medium text-foreground mb-4">Unit Volume by Zone</h3>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={zoneData} barSize={32}>
+                    <XAxis dataKey="zone" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={v => v.toLocaleString()} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      formatter={(value) => [`${value.toLocaleString()} units`]}
+                      contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--hairline))', fontSize: 12 }}
+                    />
+                    <Bar dataKey="units" fill="hsl(var(--evergreen))" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             );
-              })}
-            </div>
-          </div>
-
-          {/* Volume chart */}
-          <div className="bg-card border border-hairline rounded-xl p-4">
-            <h3 className="text-sm font-medium text-foreground mb-4">Transaction Volume by Zone</h3>
-            <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={summary} barSize={32}>
-                  <XAxis dataKey="zone" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis tickFormatter={v => `${(v / 1000).toFixed(0)}K`} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    formatter={(value) => [`${value.toLocaleString()} transactions`]}
-                    contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--hairline))', fontSize: 12 }}
-                  />
-                  <Bar dataKey="transactions" fill="hsl(var(--evergreen))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </>
-        )}
+          })()}
+        </>
+      )}
     </div>
   );
 }
