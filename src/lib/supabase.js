@@ -39,9 +39,18 @@ export async function getDeals() {
 
 // ─── Owners ───────────────────────────────────────────────────────────────
 
-export async function getOwners() {
-  const { data, error } = await supabase.from('raco_owners').select('id,full_name,email,phone,total_properties').limit(200);
-  if (error) return [];
+export async function getOwners(lensEmail) {
+  let q = agentDb
+    .from('raco_owner_intelligence')
+    .select('*')
+    .limit(200)
+    .order('last_contacted_at', { ascending: false, nullsFirst: false });
+  if (lensEmail) q = q.eq('assigned_agent_email', lensEmail);
+  const { data, error } = await q;
+  if (error) {
+    console.warn('raco_owner_intelligence query error:', error);
+    return [];
+  }
   return data || [];
 }
 
