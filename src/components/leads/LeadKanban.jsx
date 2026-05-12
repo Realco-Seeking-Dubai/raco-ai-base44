@@ -109,9 +109,17 @@ export default function LeadKanban({ leads, listings, agents, onLeadUpdated }) {
                                 )}
                                 {matched.length > 0 && <ListingLinkBadge count={matched.length} />}
                               </div>
-                              {lead.budget_aed && (
+                              {(lead.community || lead.region) && (
+                                <div className="text-xs text-muted-foreground truncate mb-1">
+                                  {lead.community ? `${lead.community}` : ''}{lead.community && lead.region ? ' · ' : ''}{lead.region || ''}
+                                </div>
+                              )}
+                              {lead.budget && (
                                 <div className="text-xs text-muted-foreground font-mono mb-2">
-                                  AED {Number(lead.budget_aed).toLocaleString()}
+                                  AED {Number(lead.budget.split('|')[0]).toLocaleString()}
+                                  {lead.budget.split('|')[1] && lead.budget.split('|')[1] !== lead.budget.split('|')[0]
+                                    ? ` – ${Number(lead.budget.split('|')[1]).toLocaleString()}`
+                                    : ''}
                                 </div>
                               )}
                               <div className="mt-2" onClick={e => e.stopPropagation()}>

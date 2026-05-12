@@ -230,7 +230,7 @@ export default function Leads() {
                       </td>
                       <td className="px-4 py-3"><StatusBadge status={lead.stage || 'new'} /></td>
                       <td className="px-4 py-3 text-muted-foreground text-xs font-mono hidden md:table-cell">
-                        {lead.budget_aed ? `AED ${Number(lead.budget_aed).toLocaleString()}` : '—'}
+                        {lead.budget ? `AED ${Number(lead.budget.split('|')[0]).toLocaleString()}` : '—'}
                       </td>
                       <td className="px-4 py-3 hidden lg:table-cell">
                         <ListingLinkBadge count={matched.length} />

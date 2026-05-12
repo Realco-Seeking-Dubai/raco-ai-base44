@@ -13,7 +13,7 @@ export function computeLeadScore(lead) {
   score += stageWeights[(lead.stage || 'new').toLowerCase()] || 5;
 
   // Budget (weight: 25) — higher budget = higher score
-  const budget = Number(lead.budget_aed) || 0;
+  const budget = Number((lead.budget || '').split('|')[0]) || 0;
   if (budget >= 10_000_000) score += 25;
   else if (budget >= 5_000_000) score += 20;
   else if (budget >= 2_000_000) score += 15;

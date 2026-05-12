@@ -66,16 +66,27 @@ export default function LeadDetailDrawer({ lead, listings, agents, onClose, onAs
 
           {/* Key details */}
           <div className="bg-surface rounded-xl p-4 space-y-2.5 text-sm">
-            {lead.budget_aed && (
+            {lead.budget && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Budget</span>
-                <span className="font-semibold font-mono text-foreground">AED {Number(lead.budget_aed).toLocaleString()}</span>
+                <span className="font-semibold font-mono text-foreground">
+                  AED {Number(lead.budget.split('|')[0]).toLocaleString()}
+                  {lead.budget.split('|')[1] && lead.budget.split('|')[1] !== lead.budget.split('|')[0]
+                    ? ` – ${Number(lead.budget.split('|')[1]).toLocaleString()}`
+                    : ''}
+                </span>
               </div>
             )}
-            {lead.zone && (
+            {lead.community && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Zone</span>
-                <span className="text-foreground">{lead.zone}</span>
+                <span className="text-muted-foreground">Community</span>
+                <span className="text-foreground">{lead.community}</span>
+              </div>
+            )}
+            {lead.region && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Region</span>
+                <span className="text-foreground">{lead.region}</span>
               </div>
             )}
             {lead.property_type && (
