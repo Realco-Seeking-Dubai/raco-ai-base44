@@ -1,6 +1,28 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
+async function fetchAll(client, tableName, columns) {
+  const PAGE_SIZE = 1000;
+  let allRows = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await client
+      .from(tableName)
+      .select(columns)
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) {
+      console.error(`[getScopeList] fetchAll error on ${tableName}:`, error.message);
+      break;
+    }
+    if (!data || data.length === 0) break;
+    allRows = allRows.concat(data);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  console.log(`[getScopeList] fetchAll ${tableName}: ${allRows.length} rows`);
+  return allRows;
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -17,55 +39,50 @@ Deno.serve(async (req) => {
       { db: { schema: 'agent' } }
     );
 
-    // All three sources — v_admin_scope_projects and v_workspace_scopes are in PUBLIC schema
-    const [scopeProjectsRes, workspaceScopesRes, projectsRes] = await Promise.all([
-      pub.from('v_admin_scope_projects')
-        .select('zone, master_project_name, project')
-        .limit(5000),
-
-      pub.from('v_workspace_scopes')
-        .select('zone, master_project_name, project')
-        .limit(5000),
-
-      agent.from('raco_project_intelligence')
-        .select('master_project_name, area_name, final_zone_name')
-        .not('master_project_name', 'is', null)
-        .order('master_project_name', { ascending: true })
-        .limit(5000),
+    // Paginate all three sources in parallel
+    const [scopeRows, projectRows] = await Promise.all([
+      fetchAll(pub, 'v_admin_scope_projects', 'zone, master_project_name, project'),
+      fetchAll(agent, 'raco_project_intelligence', 'master_project_name, area_name, final_zone_name'),
     ]);
 
-    // Extract unique zones from v_admin_scope_projects
+    // Extract unique zones
     const zonesSeen = new Set();
-    const zones = (scopeProjectsRes.data || []).filter(r => {
-      const key = r.zone;
-      if (!key || zonesSeen.has(key)) return false;
-      zonesSeen.add(key);
-      return true;
-    }).map(r => ({ zone: r.zone }));
+    const zones = [];
+    for (const r of scopeRows) {
+      if (r.zone && !zonesSeen.has(r.zone)) {
+        zonesSeen.add(r.zone);
+        zones.push({ zone: r.zone });
+      }
+    }
+    zones.sort((a, b) => a.zone.localeCompare(b.zone));
 
-    // Extract unique master projects from v_admin_scope_projects
+    // Extract unique master projects, grouped by zone
     const masterSeen = new Set();
-    const masterProjects = (scopeProjectsRes.data || []).filter(r => {
-      const key = r.master_project_name;
-      if (!key || masterSeen.has(key)) return false;
-      masterSeen.add(key);
-      return true;
-    }).map(r => ({ project_name: r.master_project_name, zone: r.zone }));
+    const masterProjects = [];
+    for (const r of scopeRows) {
+      if (r.master_project_name && !masterSeen.has(r.master_project_name)) {
+        masterSeen.add(r.master_project_name);
+        masterProjects.push({ project_name: r.master_project_name, zone: r.zone });
+      }
+    }
+    masterProjects.sort((a, b) => a.project_name.localeCompare(b.project_name));
 
-    // Extract unique buildings/projects from raco_project_intelligence
+    // Extract unique buildings from raco_project_intelligence
     const buildingSeen = new Set();
-    const projects = (projectsRes.data || []).filter(r => {
-      const key = r.master_project_name;
-      if (!key || buildingSeen.has(key)) return false;
-      buildingSeen.add(key);
-      return true;
-    }).map(r => ({ master_project_name: r.master_project_name, zone: r.final_zone_name, area: r.area_name }));
+    const projects = [];
+    for (const r of projectRows) {
+      if (r.master_project_name && !buildingSeen.has(r.master_project_name)) {
+        buildingSeen.add(r.master_project_name);
+        projects.push({
+          master_project_name: r.master_project_name,
+          zone: r.final_zone_name,
+          area: r.area_name,
+        });
+      }
+    }
+    projects.sort((a, b) => a.master_project_name.localeCompare(b.master_project_name));
 
-    console.log('[getScopeList] zones:', zones.length, '| masterProjects:', masterProjects.length, '| projects:', projects.length);
-    console.log('[getScopeList] scopeProjects error:', scopeProjectsRes.error?.message || 'none');
-    console.log('[getScopeList] workspaceScopes error:', workspaceScopesRes.error?.message || 'none');
-    console.log('[getScopeList] projects error:', projectsRes.error?.message || 'none');
-
+    console.log(`[getScopeList] FINAL — zones: ${zones.length} | masterProjects: ${masterProjects.length} | projects: ${projects.length}`);
     return Response.json({ zones, masterProjects, projects });
   } catch (err) {
     console.error('[getScopeList] EXCEPTION:', err.message);
