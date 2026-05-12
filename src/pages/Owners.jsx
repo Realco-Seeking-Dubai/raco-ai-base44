@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useLens } from '@/lib/LensContext';
-import { Search, Loader2, MapPin, Building2, Home, Users, X, RefreshCw } from 'lucide-react';
+import { Search, Loader2, MapPin, Building2, Home, X, FileSpreadsheet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import OwnerBreadcrumbs from '@/components/owners/OwnerBreadcrumbs';
 import OwnerCard from '@/components/owners/OwnerCard';
@@ -20,19 +20,19 @@ function GridSkeleton({ n = 6 }) {
   );
 }
 
-function TileButton({ label, count, icon: Icon, color = 'bg-evergreen-tint text-evergreen', onClick }) {
+function TileButton({ label, icon: Icon, color = 'bg-evergreen-tint text-evergreen', onClick, hasExcel = false }) {
   return (
     <button
       onClick={onClick}
       className="group text-left bg-card border border-hairline rounded-xl p-4 hover:shadow-sm hover:border-evergreen/40 transition-all"
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="text-sm font-semibold text-foreground group-hover:text-evergreen transition-colors">{label}</div>
+        <div className="text-sm font-semibold text-foreground group-hover:text-evergreen transition-colors leading-tight">{label}</div>
         <Icon className="w-4 h-4 text-muted-foreground group-hover:text-evergreen transition-colors shrink-0 mt-0.5" />
       </div>
-      {count != null && (
-        <div className={cn('mt-2 inline-block text-[11px] px-1.5 py-0.5 rounded font-medium', color)}>
-          {count}
+      {hasExcel && (
+        <div className="mt-2 inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-brass-tint text-brass border border-brass/20 font-medium">
+          <FileSpreadsheet className="w-2.5 h-2.5" /> Special 2025 data
         </div>
       )}
     </button>
@@ -104,12 +104,12 @@ export default function Owners() {
       .finally(() => setLoading(false));
   }
 
-  function drillProject(project) {
-    setSelectedProject(project);
+  function drillProject(projectName) {
+    setSelectedProject(projectName);
     setOwners([]);
     setStep('owners');
     setLoading(true);
-    invoke('owners_by_project', { project })
+    invoke('owners_by_project', { project: projectName })
       .then(d => setOwners(d?.owners || []))
       .finally(() => setLoading(false));
   }
@@ -238,9 +238,13 @@ export default function Owners() {
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {projects.length === 0 ? (
                 <div className="col-span-full text-sm text-muted-foreground py-8 text-center">No buildings found in {selectedMaster}.</div>
-              ) : projects.map(p => (
-                <TileButton key={p} label={p} icon={Home} color="bg-sky-tint text-sky" onClick={() => drillProject(p)} />
-              ))}
+              ) : projects.map(p => {
+                const name = typeof p === 'string' ? p : p.name;
+                const hasExcel = typeof p === 'object' && p.has_excel;
+                return (
+                  <TileButton key={name} label={name} icon={Home} color="bg-sky-tint text-sky" hasExcel={hasExcel} onClick={() => drillProject(name)} />
+                );
+              })}
             </div>
           ) : step === 'owners' ? (
             <div>
