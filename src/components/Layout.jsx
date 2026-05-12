@@ -80,16 +80,12 @@ export default function Layout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const { isAdmin } = useAuth();
 
   const visibleNav = NAV.map(g => ({
     ...g,
-    items: g.items.filter(item => {
-      if (item.path === '/admin' && !isAdmin) return false;
-      if (item.path === '/compliance' && !isAdmin) return false;
-      if (item.path === '/agents' && !(isAdmin || user?.role === 'sales_manager')) return false;
-      return true;
-    }),
+    // Hide entire 'Operations' group from non-admins
+    items: g.group === 'Operations' && !isAdmin ? [] : g.items,
   })).filter(g => g.items.length > 0);
 
   const Sidebar = (
@@ -194,7 +190,7 @@ export default function Layout() {
             <Menu className="w-5 h-5" />
           </button>
           <div className="flex-1" />
-          <ViewAsSelector />
+          {isAdmin && <ViewAsSelector />}
           <button className="w-8 h-8 rounded-md hover:bg-surface flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
             <Bell className="w-4 h-4" />
           </button>

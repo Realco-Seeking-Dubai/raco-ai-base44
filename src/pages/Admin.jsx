@@ -1,45 +1,41 @@
 import { useEffect, useState } from 'react';
 import { getPixxiUsers } from '@/lib/supabase';
+import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import PageHeader from '@/components/ui/PageHeader';
 import StatusBadge from '@/components/ui/StatusBadge';
 import EmptyState from '@/components/ui/EmptyState';
 import UserLifecycleActions from '@/components/admin/UserLifecycleActions';
 import UserDetailPanel from '@/components/admin/UserDetailPanel';
-import { Users, Search, RefreshCw, ChevronRight } from 'lucide-react';
+import InviteUserModal from '@/components/admin/InviteUserModal';
+import { Users, Search, RefreshCw, ChevronRight, UserPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const TABS = ['Users', 'Scope Map'];
 
 export default function Admin() {
+  const { isAdmin } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('Users');
   const [search, setSearch] = useState('');
   const [selectedUser, setSelectedUser] = useState(null);
+  const [showInvite, setShowInvite] = useState(false);
 
   function loadUsers() {
     setLoading(true);
     getPixxiUsers()
-      .then(data => {
-        setUsers(data || []);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Users fetch error:', err);
-        setUsers([]);
-        setLoading(false);
-      });
+      .then(data => { setUsers(data || []); setLoading(false); })
+      .catch(err => { console.error('Users fetch error:', err); setUsers([]); setLoading(false); });
   }
 
   useEffect(() => { loadUsers(); }, []);
 
   function handleUserUpdated(userId, updatedData) {
     setUsers(prev => prev.map(u => u.id === userId ? { ...u, ...updatedData } : u));
-    // Keep panel in sync
     if (selectedUser?.id === userId) setSelectedUser(u => ({ ...u, ...updatedData }));
   }
 
-  // Legacy lifecycle-only callback for inline actions
   function handleLifecycleUpdated(userId, newStatus) {
     handleUserUpdated(userId, { lifecycle_status: newStatus, is_active: newStatus === 'active' });
   }
@@ -54,9 +50,19 @@ export default function Admin() {
         title="Users & Admin"
         subtitle={`${users.length} total users`}
         actions={
-          <button onClick={loadUsers} className="px-3 py-1.5 text-sm rounded-lg border border-hairline bg-card font-medium flex items-center gap-1.5 hover:bg-surface transition-colors text-muted-foreground">
-            <RefreshCw className="w-3.5 h-3.5" /> Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <button
+                onClick={() => setShowInvite(true)}
+                className="px-3 py-1.5 text-sm rounded-lg border border-evergreen bg-evergreen-tint text-evergreen font-medium flex items-center gap-1.5 hover:bg-evergreen hover:text-white transition-colors"
+              >
+                <UserPlus className="w-3.5 h-3.5" /> Invite User
+              </button>
+            )}
+            <button onClick={loadUsers} className="px-3 py-1.5 text-sm rounded-lg border border-hairline bg-card font-medium flex items-center gap-1.5 hover:bg-surface transition-colors text-muted-foreground">
+              <RefreshCw className="w-3.5 h-3.5" /> Refresh
+            </button>
+          </div>
         }
       />
 
@@ -152,12 +158,9 @@ export default function Admin() {
       )}
 
       {tab === 'Scope Map' && (
-        <div className="bg-card border border-hairline rounded-xl p-6">
-          <p className="text-sm text-muted-foreground">Scope assignments are derived from Pixxi listings and user zone preferences. Manage via the Pixxi dashboard or contact your system admin.</p>
-        </div>
+        <ScopeMap />
       )}
 
-      {/* User Detail Panel */}
       {selectedUser && (
         <UserDetailPanel
           user={selectedUser}
@@ -165,6 +168,60 @@ export default function Admin() {
           onUserUpdated={handleUserUpdated}
         />
       )}
+
+      {showInvite && (
+        <InviteUserModal onClose={() => setShowInvite(false)} onInvited={loadUsers} />
+      )}
+    </div>
+  );
+}
+
+// ── Scope Map tab ────────────────────────────────────────────────────────────
+function ScopeMap() {
+  const [assignments, setAssignments] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    base44.functions.invoke('getWorkspaceAssignments', {})
+      .then(res => { setAssignments(res.data?.assignments || []); setLoading(false); })
+      .catch(() => { setAssignments([]); setLoading(false); });
+  }, []);
+
+  // Group by user
+  const byUser = assignments.reduce((acc, row) => {
+    const key = row.user_email || row.user_id || 'Unknown';
+    if (!acc[key]) acc[key] = { email: key, name: row.full_name || row.name || key, rows: [] };
+    acc[key].rows.push(row);
+    return acc;
+  }, {});
+
+  if (loading) return <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-16 bg-surface rounded-xl animate-pulse" />)}</div>;
+
+  const entries = Object.values(byUser);
+
+  if (entries.length === 0) {
+    return (
+      <div className="bg-card border border-hairline rounded-xl p-6">
+        <p className="text-sm text-muted-foreground">No workspace assignments found in <code>v_workspace_assignments</code>. Manage via Pixxi dashboard or contact your system admin.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {entries.map(entry => (
+        <div key={entry.email} className="bg-card border border-hairline rounded-xl p-4">
+          <div className="text-sm font-semibold text-foreground mb-2">{entry.name}</div>
+          <div className="text-xs text-muted-foreground mb-3">{entry.email}</div>
+          <div className="flex flex-wrap gap-1.5">
+            {entry.rows.map((r, i) => (
+              <span key={i} className="text-[11px] px-2 py-0.5 rounded bg-evergreen-tint text-evergreen font-medium">
+                {r.project_name || r.zone || r.area || '—'}
+              </span>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
