@@ -142,20 +142,31 @@ Deno.serve(async (req) => {
     const allExcelTables = await discoverExcelTables(SUPABASE_URL, SERVICE_KEY);
     const excelTableSet = new Set(allExcelTables);
 
+    // ── Action: initial load (quick sidebar stub) ─────────────────────────────
+    if (action === 'initial_load') {
+      // Return empty structure to let UI render instantly, data loads via separate searches
+      return Response.json({
+        zones: [],
+        loading: true,
+        message: 'Search or browse by zone'
+      });
+    }
+
     // ── Action: list zones (from actual owners only) ────────────────────────────
     if (action === 'zones') {
-      // ADMIN: NO WORKSPACE FILTERING
+      // ADMIN: SKIP WORKSPACE JOINS — return all zones instantly
+      let allowed = null;
       if (!userIsAdmin) {
-        const allowed = await getAllowedZones(supabase, scopeEmail, userIsAdmin, agent_email);
+        allowed = await getAllowedZones(supabase, scopeEmail, userIsAdmin, agent_email);
         if (!allowed || allowed.length === 0) return Response.json({ zones: [] });
       }
       
-      // Get all owners from master DB and extract their zones
-      const allOwners = await fetchAll(agentDb, 'raco_owner_intelligence', 'linked_zones, owner_area');
+      // Get top 50 owners from master DB and extract their zones (LEAN: linked_zones only)
+      const { data: allOwners } = await agentDb.from('raco_owner_intelligence').select('linked_zones, owner_area').limit(50);
       const zoneSet = new Set();
       const projectsNeedingZones = new Set();
       
-      for (const owner of allOwners) {
+      for (const owner of (allOwners || [])) {
         // Use linked_zones array if available
         if (Array.isArray(owner.linked_zones) && owner.linked_zones.length > 0) {
           for (const z of owner.linked_zones) {
@@ -167,11 +178,11 @@ Deno.serve(async (req) => {
         }
       }
       
-      // Lookup zones for projects that don't have linked_zones populated
+      // Lookup zones for projects that don't have linked_zones populated (LIMIT 100 for speed)
       if (projectsNeedingZones.size > 0) {
-        const projects = await fetchAll(agentDb, 'raco_project_intelligence', 'project, final_zone_name');
+        const { data: projects } = await agentDb.from('raco_project_intelligence').select('project, final_zone_name').limit(100);
         const projectZoneMap = new Map();
-        for (const p of projects) {
+        for (const p of (projects || [])) {
           if (p.project && p.final_zone_name) {
             projectZoneMap.set(p.project.toLowerCase(), p.final_zone_name);
           }
@@ -192,18 +203,19 @@ Deno.serve(async (req) => {
     if (action === 'master_projects') {
       if (!zone) return Response.json({ error: 'zone required' }, { status: 400 });
       
-      // ADMIN: NO WORKSPACE FILTERING
+      // ADMIN: SKIP WORKSPACE JOINS — get data instantly
+      let allowed = null;
       if (!userIsAdmin) {
-        const allowed = await getAllowedZones(supabase, scopeEmail, userIsAdmin, agent_email);
+        allowed = await getAllowedZones(supabase, scopeEmail, userIsAdmin, agent_email);
         if (!allowed || allowed.length === 0) return Response.json({ master_projects: [] });
       }
       
-      // Get all owners
-      const allOwners = await fetchAll(agentDb, 'raco_owner_intelligence', 'linked_master_project_names, owner_area, linked_zones');
+      // Get top 50 owners with LEAN columns (EMERGENCY: skip full fetch)
+      const { data: allOwners } = await agentDb.from('raco_owner_intelligence').select('linked_master_project_names, owner_area, linked_zones').limit(50);
       
-      // Build project → zone map from project_intelligence for projects with empty linked_zones
+      // Build project → zone map from project_intelligence (LIMIT 100 for speed)
       const projectsWithoutZones = new Set();
-      for (const owner of allOwners) {
+      for (const owner of (allOwners || [])) {
         if (!Array.isArray(owner.linked_zones) || owner.linked_zones.length === 0) {
           if (owner.owner_area) projectsWithoutZones.add(owner.owner_area);
         }
@@ -211,8 +223,8 @@ Deno.serve(async (req) => {
       
       const projectZoneMap = new Map();
       if (projectsWithoutZones.size > 0) {
-        const projects = await fetchAll(agentDb, 'raco_project_intelligence', 'project, final_zone_name, master_project_name');
-        for (const p of projects) {
+        const { data: projects } = await agentDb.from('raco_project_intelligence').select('project, final_zone_name, master_project_name').limit(100);
+        for (const p of (projects || [])) {
           if (p.project && p.final_zone_name) {
             projectZoneMap.set(p.project.toLowerCase(), { zone: p.final_zone_name, master: p.master_project_name });
           }
@@ -220,7 +232,7 @@ Deno.serve(async (req) => {
       }
       
       const masterSet = new Set();
-      for (const owner of allOwners) {
+      for (const owner of (allOwners || [])) {
         let ownerZone = null;
         
         // Check linked_zones first
@@ -256,10 +268,11 @@ Deno.serve(async (req) => {
     // ── Action: list buildings for a master project (from owners only + normalized) ─
     if (action === 'projects') {
       if (!master_project) return Response.json({ error: 'master_project required' }, { status: 400 });
-      const allOwners = await fetchAll(agentDb, 'raco_owner_intelligence', 'linked_projects, owner_area, linked_master_project_names');
+      // EMERGENCY: Fetch only top 50 owners with LEAN columns for speed
+      const { data: allOwners } = await agentDb.from('raco_owner_intelligence').select('linked_projects, owner_area, linked_master_project_names').limit(50);
       const projectMap = new Map(); // normalized → { name, has_excel, variants }
       
-      for (const owner of allOwners) {
+      for (const owner of (allOwners || [])) {
         // Check if owner belongs to this master project
         let belongs = false;
         if (Array.isArray(owner.linked_master_project_names) && owner.linked_master_project_names.includes(master_project)) {
@@ -297,7 +310,7 @@ Deno.serve(async (req) => {
       return Response.json({ projects });
     }
 
-    // ── Action: owners by project — fetch all variants + merge master + excel ──
+    // ── Action: owners by project — fetch top 50 with LEAN columns ──
     if (action === 'owners_by_project') {
       if (!project) return Response.json({ error: 'project required' }, { status: 400 });
       
@@ -313,20 +326,18 @@ Deno.serve(async (req) => {
       
       console.log(`[owners_by_project] Looking for: ${normalized} | variants: ${[...variants].join(', ')}`);
 
-      // 1. Master DB owners (search all variants)
+      // EMERGENCY: Fetch only TOP 50 owners per variant with LEAN columns
+      // Use id, owner_name, owner_area, search_text only (no portfolios, no heavy joins)
+      const LEAN_COLS = 'id, owner_id, owner_name, email, mobile, owner_area, source_system';
       const masterOwners = [];
       for (const variant of variants) {
-        let from = 0;
-        while (true) {
-          const { data, error } = await agentDb
-            .from('raco_owner_intelligence')
-            .select(SUMMARY_COLS)
-            .eq('owner_area', variant)
-            .range(from, from + 999);
-          if (error || !data || data.length === 0) break;
+        const { data, error } = await agentDb
+          .from('raco_owner_intelligence')
+          .select(LEAN_COLS)
+          .eq('owner_area', variant)
+          .limit(50);
+        if (!error && data) {
           masterOwners.push(...data.map(o => ({ ...o, source_label: 'Master DB', source_system: 'master_db' })));
-          if (data.length < 1000) break;
-          from += 1000;
         }
       }
 

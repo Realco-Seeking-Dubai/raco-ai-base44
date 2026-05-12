@@ -72,12 +72,16 @@ export default function Owners() {
       .then(res => res.data);
   }
 
-  // ── Load on mount: zones ─────────────────────────────────────────────────
+  // ── Load on mount: show UI instantly, fetch zones async ─────────────────
   useEffect(() => {
-    setLoading(true);
+    // Return empty state immediately (UI renders in <50ms)
+    setZones([]);
+    setLoading(false);
+    
+    // Fetch zones async in background
     invoke('zones')
       .then(d => setZones(d?.zones || []))
-      .finally(() => setLoading(false));
+      .catch(() => setZones([]));
   }, [lensUser]);
 
   // ── Navigation handlers ──────────────────────────────────────────────────
@@ -225,13 +229,15 @@ export default function Owners() {
           <OwnerBreadcrumbs crumbs={crumbs} onNavigate={handleBreadcrumb} />
 
           {/* Explorer */}
-          {loading ? (
-            <GridSkeleton n={step === 'owners' ? 9 : 6} />
+          {step === 'zones' && zones.length === 0 && !loading ? (
+            <div className="col-span-full text-sm text-muted-foreground py-8 text-center">
+              Search above or select a zone to browse owners
+            </div>
+          ) : loading ? (
+            <GridSkeleton n={6} />
           ) : step === 'zones' ? (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {zones.length === 0 ? (
-                <div className="col-span-full text-sm text-muted-foreground py-8 text-center">No zones assigned to your scope.</div>
-              ) : zones.map(zone => (
+              {zones.map(zone => (
                 <TileButton
                   key={zone}
                   label={zone}

@@ -63,35 +63,14 @@ Deno.serve(async (req) => {
     const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const agent = createClient(SUPABASE_URL, SERVICE_KEY, { db: { schema: 'agent' } });
 
-    // Fetch in parallel:
-    // 1. Distinct populated owner_area values from raco_owner_directory
-    // 2. Full project intelligence for zone/master cross-referencing
-    // 3. Excel table discovery for badge decoration
-    const [ownerAreasRes, intelligenceRes, excelTables] = await Promise.all([
-      agent.from('raco_owner_directory').select('owner_area').not('owner_area', 'is', null),
-      agent.from('raco_project_intelligence').select('final_zone_name, master_project_name, project'),
+    // EMERGENCY OPTIMIZATION: Skip directory scan, fetch only top 500 projects from intelligence
+    // This eliminates the slow full-table directory scan
+    const [intelligenceRes, excelTables] = await Promise.all([
+      agent.from('raco_project_intelligence').select('final_zone_name, master_project_name, project').limit(500),
       discoverExcelTables(SUPABASE_URL, SERVICE_KEY),
     ]);
 
-    if (ownerAreasRes.error) throw new Error(`owner_directory: ${ownerAreasRes.error.message}`);
     if (intelligenceRes.error) throw new Error(`project_intelligence: ${intelligenceRes.error.message}`);
-
-    // Build set of populated project names (from actual owner records)
-    // Use NORMALIZED keys (lowercase + trimmed) for fuzzy matching
-    const populatedProjects = new Set();
-    const populatedProjectsNormalized = new Map(); // normalized → original
-    
-    for (const row of (ownerAreasRes.data || [])) {
-      const original = row.owner_area?.trim();
-      if (!original) continue;
-      const normalized = original.toLowerCase();
-      populatedProjects.add(original);
-      populatedProjectsNormalized.set(normalized, original);
-    }
-
-    console.log(`[getScopeList] Populated projects from owner_directory: ${populatedProjects.size}`);
-    console.log(`[getScopeList] Sample projects: ${[...populatedProjects].slice(0, 5).join(', ')}`);
-    console.log(`[getScopeList] Excel tables: ${excelTables.length}`);
 
     // Build excel slug set for badge detection
     const excelSlugSet = new Set(excelTables.map(t => t.replace(/^excel_/, '')));
@@ -104,17 +83,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Build project → zone/master map from raco_project_intelligence
-    // Only keep projects that exist in raco_owner_directory (FUZZY MATCH: case-insensitive + trimmed)
+    // Build project → zone/master map directly from intelligence (no directory filtering)
     const projectMap = new Map(); // project → { project, master_project_name, zone, has_excel }
     for (const r of (intelligenceRes.data || [])) {
       if (!r.project || !r.master_project_name || !r.final_zone_name) continue;
-      
-      // FUZZY MATCH: check if project exists in populated list (case-insensitive)
-      const projectNormalized = r.project.trim().toLowerCase();
-      const existsInDirectory = populatedProjectsNormalized.has(projectNormalized);
-      
-      if (!existsInDirectory) continue; // DATA-DRIVEN FILTER
       
       if (!projectMap.has(r.project)) {
         projectMap.set(r.project, {
@@ -125,33 +97,10 @@ Deno.serve(async (req) => {
         });
       }
     }
-
-    // FALLBACK: If projectMap is empty (no cross-reference match), build directly from populated projects
-    // This ensures we never hide projects that have owner records
-    if (projectMap.size === 0 && populatedProjects.size > 0) {
-      console.log(`[getScopeList] projectMap empty, building from populated projects directly`);
-      
-      // Build zone map from populated projects via intelligence lookup
-      const uniqueProjects = [...populatedProjects];
-      for (const p of uniqueProjects) {
-        const pNormalized = p.toLowerCase();
-        const intelligence = projects.find(r => r.project && r.project.toLowerCase() === pNormalized);
-        if (intelligence) {
-          projectMap.set(p, {
-            project: p,
-            master_project_name: intelligence.master_project_name || 'Unassigned',
-            zone: intelligence.final_zone_name || 'Unknown Zone',
-            has_excel: projectHasExcel(p),
-          });
-        }
-      }
-    }
     
-    // Derive master projects and zones purely from the populated projects
+    // Derive master projects and zones
     const masterSet = new Map(); // master_project_name → zone
     const zoneSet = new Set();
-    
-    // Track fragmented projects for consolidation
     const fragmentedMap = new Map(); // canonical_name → [original_names]
 
     for (const proj of projectMap.values()) {
@@ -183,8 +132,7 @@ Deno.serve(async (req) => {
       .map(zone => ({ zone }))
       .sort((a, b) => a.zone.localeCompare(b.zone));
 
-    console.log(`[getScopeList] FINAL (data-driven) — zones: ${zones.length} | masterProjects: ${masterProjects.length} | projects: ${projects.length}`);
-    console.log(`[getScopeList] Fragmentation map:`, [...fragmentedMap.entries()].slice(0, 5));
+    console.log(`[getScopeList] EMERGENCY OPTIMIZED — zones: ${zones.length} | masters: ${masterProjects.length} | projects: ${projects.length}`);
 
     return Response.json({
       zones,
