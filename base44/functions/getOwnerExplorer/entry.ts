@@ -144,42 +144,112 @@ Deno.serve(async (req) => {
 
     // ── Action: list zones (from actual owners only) ────────────────────────────
     if (action === 'zones') {
-      const allowed = await getAllowedZones(supabase, scopeEmail, userIsAdmin, agent_email);
+      // ADMIN: NO WORKSPACE FILTERING
+      if (!userIsAdmin) {
+        const allowed = await getAllowedZones(supabase, scopeEmail, userIsAdmin, agent_email);
+        if (!allowed || allowed.length === 0) return Response.json({ zones: [] });
+      }
+      
       // Get all owners from master DB and extract their zones
       const allOwners = await fetchAll(agentDb, 'raco_owner_intelligence', 'linked_zones, owner_area');
       const zoneSet = new Set();
+      const projectsNeedingZones = new Set();
       
       for (const owner of allOwners) {
         // Use linked_zones array if available
-        if (Array.isArray(owner.linked_zones)) {
+        if (Array.isArray(owner.linked_zones) && owner.linked_zones.length > 0) {
           for (const z of owner.linked_zones) {
-            if (z && (!allowed || allowed.includes(z))) zoneSet.add(z);
+            if (z) zoneSet.add(z);
           }
+        } else if (owner.owner_area) {
+          // Mark for lookup via project_intelligence
+          projectsNeedingZones.add(owner.owner_area);
+        }
+      }
+      
+      // Lookup zones for projects that don't have linked_zones populated
+      if (projectsNeedingZones.size > 0) {
+        const projects = await fetchAll(agentDb, 'raco_project_intelligence', 'project, final_zone_name');
+        const projectZoneMap = new Map();
+        for (const p of projects) {
+          if (p.project && p.final_zone_name) {
+            projectZoneMap.set(p.project.toLowerCase(), p.final_zone_name);
+          }
+        }
+        
+        for (const proj of projectsNeedingZones) {
+          const zone = projectZoneMap.get(proj.toLowerCase());
+          if (zone) zoneSet.add(zone);
         }
       }
       
       const zones = [...zoneSet].sort();
+      console.log(`[getOwnerExplorer] zones | admin: ${userIsAdmin} | count: ${zones.length}`);
       return Response.json({ zones });
     }
 
     // ── Action: list master projects for a zone (from owners only) ────────────────
     if (action === 'master_projects') {
       if (!zone) return Response.json({ error: 'zone required' }, { status: 400 });
-      const allOwners = await fetchAll(agentDb, 'raco_owner_intelligence', 'linked_master_project_names, owner_area, linked_zones');
-      const masterSet = new Set();
       
+      // ADMIN: NO WORKSPACE FILTERING
+      if (!userIsAdmin) {
+        const allowed = await getAllowedZones(supabase, scopeEmail, userIsAdmin, agent_email);
+        if (!allowed || allowed.length === 0) return Response.json({ master_projects: [] });
+      }
+      
+      // Get all owners
+      const allOwners = await fetchAll(agentDb, 'raco_owner_intelligence', 'linked_master_project_names, owner_area, linked_zones');
+      
+      // Build project → zone map from project_intelligence for projects with empty linked_zones
+      const projectsWithoutZones = new Set();
       for (const owner of allOwners) {
-        // Check if owner's linked zones include the requested zone
+        if (!Array.isArray(owner.linked_zones) || owner.linked_zones.length === 0) {
+          if (owner.owner_area) projectsWithoutZones.add(owner.owner_area);
+        }
+      }
+      
+      const projectZoneMap = new Map();
+      if (projectsWithoutZones.size > 0) {
+        const projects = await fetchAll(agentDb, 'raco_project_intelligence', 'project, final_zone_name, master_project_name');
+        for (const p of projects) {
+          if (p.project && p.final_zone_name) {
+            projectZoneMap.set(p.project.toLowerCase(), { zone: p.final_zone_name, master: p.master_project_name });
+          }
+        }
+      }
+      
+      const masterSet = new Set();
+      for (const owner of allOwners) {
+        let ownerZone = null;
+        
+        // Check linked_zones first
         if (Array.isArray(owner.linked_zones) && owner.linked_zones.includes(zone)) {
+          ownerZone = zone;
+        } else if (owner.owner_area) {
+          // Lookup via project_intelligence
+          const lookup = projectZoneMap.get(owner.owner_area.toLowerCase());
+          if (lookup && lookup.zone === zone) {
+            ownerZone = zone;
+          }
+        }
+        
+        if (ownerZone) {
           if (Array.isArray(owner.linked_master_project_names)) {
             for (const m of owner.linked_master_project_names) {
               if (m) masterSet.add(m);
             }
           }
+          // Also add via project_intelligence lookup if needed
+          if (owner.owner_area && projectZoneMap.has(owner.owner_area.toLowerCase())) {
+            const lookup = projectZoneMap.get(owner.owner_area.toLowerCase());
+            if (lookup && lookup.master) masterSet.add(lookup.master);
+          }
         }
       }
       
       const masters = [...masterSet].sort();
+      console.log(`[getOwnerExplorer] master_projects | zone: ${zone} | admin: ${userIsAdmin} | count: ${masters.length}`);
       return Response.json({ master_projects: masters });
     }
 
@@ -319,7 +389,11 @@ Deno.serve(async (req) => {
     if (action === 'search') {
       if (!search || search.trim().length < 2) return Response.json({ results: [] });
       const q = search.trim().toLowerCase();
-      const allowed = await getAllowedZones(supabase, scopeEmail, userIsAdmin, agent_email);
+      
+      let allowed = null;
+      if (!userIsAdmin) {
+        allowed = await getAllowedZones(supabase, scopeEmail, userIsAdmin, agent_email);
+      }
 
       // 1. Search master DB
       const [byText, byMobile, byPropId] = await Promise.all([
@@ -331,6 +405,7 @@ Deno.serve(async (req) => {
       const merged = new Map();
       for (const o of [...(byText.data || []), ...(byMobile.data || []), ...(byPropId.data || [])]) {
         if (merged.has(o.id)) continue;
+        // ADMIN: NO SCOPE FILTER; NON-ADMIN: CHECK ALLOWED ZONES
         if (allowed !== null && o.owner_area && !allowed.includes(o.owner_area)) continue;
         merged.set(o.id, { ...o, source_label: 'Master DB', source_system: 'master_db' });
       }

@@ -39,8 +39,8 @@ Deno.serve(async (req) => {
       { db: { schema: 'agent' } }
     );
 
-    // Admins get global data (or optionally scoped by agent_email)
-    if (isAdmin && !agent_email) {
+    // ADMIN: ALWAYS get global data, no workspace filtering
+    if (isAdmin) {
       const { data, error } = await agentDb
         .from('raco_owner_intelligence')
         .select('id, owner_name, email, mobile, owner_area, property_id, source_system, owner_record_count, linked_project_count')
@@ -55,8 +55,8 @@ Deno.serve(async (req) => {
       return Response.json({ owners: data || [], is_global: true });
     }
 
-    // Resolve scope email: admin impersonating an agent, or the user themselves
-    const scopeEmail = isAdmin ? agent_email : user.email;
+    // Non-admin: scope by workspace assignments
+    const scopeEmail = user.email;
 
     // Mandatory: look up v_workspace_assignments
     const { data: wsRows, error: wsError } = await supabase
