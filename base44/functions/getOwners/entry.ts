@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
       const { data, error } = await agentDb
         .from('raco_owner_intelligence')
         .select('id, owner_name, email, mobile, owner_area, property_id, source_system, owner_record_count, linked_project_count')
-        .limit(200);
+        .limit(2000);
 
       if (error) {
         console.error('[getOwners] Admin query error:', JSON.stringify(error));
@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
     let q = agentDb
       .from('raco_owner_intelligence')
       .select('id, owner_name, email, mobile, owner_area, property_id, source_system, owner_record_count, linked_project_count')
-      .limit(200);
+      .limit(2000);
 
     if (assignedZones.length > 0) {
       q = q.in('owner_area', assignedZones);

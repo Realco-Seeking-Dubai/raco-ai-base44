@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
       .select('master_project_name, zone, area')
       .not('master_project_name', 'is', null)
       .order('master_project_name', { ascending: true })
-      .limit(500);
+      .limit(5000);
 
     if (error) {
       console.error('[getProjectList] Query error:', JSON.stringify(error));
