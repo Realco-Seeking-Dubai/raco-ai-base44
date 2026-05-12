@@ -114,9 +114,12 @@ export async function getMarketSummary() {
 export async function getPixxiUsers() {
   const { data, error } = await supabase
     .from('pixxi_users')
-    .select('id,full_name,email,pixxi_email,primary_email,role,lifecycle_status,is_active')
-    .order('full_name', { ascending: true });
-  if (error) return [];
+    .select('*')
+    .order('created_at', { ascending: true });
+  if (error) {
+    console.warn('pixxi_users fetch error', error);
+    return [];
+  }
   return data || [];
 }
 

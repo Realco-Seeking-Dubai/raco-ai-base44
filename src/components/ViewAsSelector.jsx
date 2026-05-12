@@ -27,8 +27,8 @@ export default function ViewAsSelector() {
   }, []);
 
   const filtered = pixxiUsers.filter(u =>
-    !search || u.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-    u.pixxi_email?.toLowerCase().includes(search.toLowerCase())
+    !search || u.name?.toLowerCase().includes(search.toLowerCase()) ||
+    u.pixxi_user_email?.toLowerCase().includes(search.toLowerCase())
   );
 
   function select(u) {
@@ -57,7 +57,7 @@ export default function ViewAsSelector() {
       >
         <User className="w-3.5 h-3.5 shrink-0" />
         <span className="max-w-[120px] truncate">
-          {isViewing ? `Viewing: ${lensUser.full_name?.split(' ')[0]}` : 'View as…'}
+          {isViewing ? `Viewing: ${lensUser.name?.split(' ')[0]}` : 'View as…'}
         </span>
         {isViewing ? (
           <X className="w-3 h-3 shrink-0" onClick={clear} />
@@ -91,11 +91,11 @@ export default function ViewAsSelector() {
                   )}
                 >
                   <div className="w-7 h-7 rounded-full bg-evergreen-tint flex items-center justify-center shrink-0">
-                    <span className="text-xs font-bold text-evergreen">{(u.full_name || '?').charAt(0)}</span>
+                    <span className="text-xs font-bold text-evergreen">{(u.name || '?').charAt(0)}</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs font-medium text-foreground truncate">{u.full_name}</div>
-                    <div className="text-[10px] text-muted-foreground truncate">{u.pixxi_email || u.primary_email}</div>
+                    <div className="text-xs font-medium text-foreground truncate">{u.name}</div>
+                    <div className="text-[10px] text-muted-foreground truncate">{u.pixxi_user_email || u.primary_email}</div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <span className={cn('w-1.5 h-1.5 rounded-full', STATUS_DOT[u.lifecycle_status] || 'bg-muted-2')} />

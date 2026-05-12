@@ -10,9 +10,8 @@ export function LensProvider({ children }) {
   useEffect(() => {
     supabase
       .from('pixxi_users')
-      .select('id, full_name, pixxi_email, primary_email, lifecycle_status, role')
-      .eq('lifecycle_status', 'active')
-      .order('full_name', { ascending: true })
+      .select('id, name, pixxi_user_email, primary_email, lifecycle_status, is_active')
+      .order('name', { ascending: true })
       .then(({ data, error }) => {
         if (error) {
           console.warn('Lens: pixxi_users fetch error', error);
@@ -22,8 +21,8 @@ export function LensProvider({ children }) {
           setPixxiUsers(users);
           // Default lens to Irfan if found
           const irfan = users.find(u =>
-            u.full_name?.toLowerCase().includes('irfan') ||
-            u.pixxi_email?.toLowerCase().includes('irfan') ||
+            u.name?.toLowerCase().includes('irfan') ||
+            u.pixxi_user_email?.toLowerCase().includes('irfan') ||
             u.primary_email?.toLowerCase().includes('irfan')
           );
           if (irfan) setLensUser(irfan);
@@ -32,7 +31,7 @@ export function LensProvider({ children }) {
   }, []);
 
   // The email to use for all data queries
-  const lensEmail = lensUser?.pixxi_email || lensUser?.primary_email || null;
+  const lensEmail = lensUser?.pixxi_user_email || lensUser?.primary_email || null;
 
   return (
     <LensContext.Provider value={{ pixxiUsers, lensUser, setLensUser, lensEmail }}>
