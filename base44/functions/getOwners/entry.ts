@@ -33,55 +33,75 @@ Deno.serve(async (req) => {
     const adminByTable = await isAdminUser(supabase, user.email);
     const isAdmin = adminByRole || adminByTable;
 
-    // Non-admins are forced to their own workspace via v_workspace_assignments
-    const effectiveEmail = isAdmin ? (agent_email || null) : user.email;
-
     const agentDb = createClient(
       Deno.env.get('SUPABASE_URL'),
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
       { db: { schema: 'agent' } }
     );
 
+    // Admins get global data (or optionally scoped by agent_email)
+    if (isAdmin && !agent_email) {
+      const { data, error } = await agentDb
+        .from('raco_owner_intelligence')
+        .select('id, owner_name, email, mobile, owner_area, property_id, source_system, owner_record_count, linked_project_count')
+        .limit(200);
+
+      if (error) {
+        console.error('[getOwners] Admin query error:', JSON.stringify(error));
+        return Response.json({ error: error.message }, { status: 500 });
+      }
+
+      console.log('[getOwners] ADMIN GLOBAL | count:', data?.length);
+      return Response.json({ owners: data || [], is_global: true });
+    }
+
+    // Resolve scope email: admin impersonating an agent, or the user themselves
+    const scopeEmail = isAdmin ? agent_email : user.email;
+
+    // Mandatory: look up v_workspace_assignments
+    const { data: wsRows, error: wsError } = await supabase
+      .from('v_workspace_assignments')
+      .select('project_name, zone, area')
+      .eq('user_email', scopeEmail);
+
+    if (wsError) {
+      console.error('[getOwners] Workspace query error:', JSON.stringify(wsError));
+      return Response.json({ owners: [], is_global: false, reason: 'workspace_error' });
+    }
+
+    if (!wsRows || wsRows.length === 0) {
+      console.log('[getOwners] No assignments for', scopeEmail, '— returning empty');
+      return Response.json({ owners: [], is_global: false, reason: 'no_scope' });
+    }
+
+    // Collect zones and areas to filter owners
+    const assignedZones = [...new Set(wsRows.flatMap(r => [r.zone, r.area]).filter(Boolean))];
+    const assignedProjects = [...new Set(wsRows.map(r => r.project_name).filter(Boolean))];
+
+    if (assignedZones.length === 0 && assignedProjects.length === 0) {
+      console.log('[getOwners] Empty assignments for', scopeEmail);
+      return Response.json({ owners: [], is_global: false, reason: 'no_scope' });
+    }
+
+    // Scope owners by owner_area matching assigned zones OR linked project
     let q = agentDb
       .from('raco_owner_intelligence')
       .select('id, owner_name, email, mobile, owner_area, property_id, source_system, owner_record_count, linked_project_count')
       .limit(200);
 
-    // For non-admins: scope to areas assigned via v_workspace_assignments
-    if (effectiveEmail) {
-      // Get assigned zones/areas for this agent
-      const { data: wsRows } = await supabase
-        .from('v_workspace_assignments')
-        .select('zone, project_name, area')
-        .eq('user_email', effectiveEmail);
-
-      if (wsRows && wsRows.length > 0) {
-        const areas = [...new Set(wsRows.map(r => r.area || r.zone).filter(Boolean))];
-        if (areas.length > 0) {
-          q = q.in('owner_area', areas);
-        } else {
-          // No assignments found — return empty for non-admin
-          if (!isAdmin) {
-            console.log('[getOwners] No workspace assignments found for', effectiveEmail);
-            return Response.json({ owners: [], is_global: false });
-          }
-        }
-      } else if (!isAdmin) {
-        // Non-admin with no workspace assignments gets empty result
-        console.log('[getOwners] No workspace assignments for non-admin', effectiveEmail);
-        return Response.json({ owners: [], is_global: false });
-      }
+    if (assignedZones.length > 0) {
+      q = q.in('owner_area', assignedZones);
     }
 
     const { data, error } = await q;
 
     if (error) {
-      console.error('[getOwners] Query error:', JSON.stringify(error));
+      console.error('[getOwners] Scoped query error:', JSON.stringify(error));
       return Response.json({ error: error.message }, { status: 500 });
     }
 
-    console.log('[getOwners] isAdmin:', isAdmin, '| scope:', effectiveEmail || 'GLOBAL', '| count:', data?.length);
-    return Response.json({ owners: data || [], is_global: isAdmin && !effectiveEmail });
+    console.log('[getOwners] scope:', scopeEmail, '| zones:', assignedZones, '| count:', data?.length);
+    return Response.json({ owners: data || [], is_global: false });
   } catch (err) {
     console.error('[getOwners]', err.message);
     return Response.json({ error: err.message }, { status: 500 });

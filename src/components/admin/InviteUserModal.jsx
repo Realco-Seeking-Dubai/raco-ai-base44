@@ -35,6 +35,7 @@ export default function InviteUserModal({ onClose, onInvited }) {
 
   async function handleInvite() {
     if (!email.trim()) { setError('Email is required.'); return; }
+    if (selectedProjects.length === 0) { setError('Please assign at least one project or zone.'); return; }
     setError('');
     setLoading(true);
     try {
@@ -119,7 +120,7 @@ export default function InviteUserModal({ onClose, onInvited }) {
               <div>
                 <label className="block text-xs font-medium text-foreground mb-1.5">
                   Assign to Projects / Zones
-                  <span className="text-muted-foreground font-normal ml-1">(optional)</span>
+                  <span className="text-terracotta ml-1">*</span>
                 </label>
                 {loadingProjects ? (
                   <div className="h-8 bg-surface rounded-lg animate-pulse" />
@@ -153,7 +154,7 @@ export default function InviteUserModal({ onClose, onInvited }) {
 
               <button
                 onClick={handleInvite}
-                disabled={loading || !email.trim()}
+                disabled={loading || !email.trim() || selectedProjects.length === 0}
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-evergreen text-white text-sm font-medium hover:bg-evergreen-mid transition-colors disabled:opacity-50"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
