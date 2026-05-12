@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { base44 } from '@/api/base44Client';
 
 const LensContext = createContext(null);
 
@@ -8,25 +8,20 @@ export function LensProvider({ children }) {
   const [lensUser, setLensUser] = useState(null); // null = viewing as self
 
   useEffect(() => {
-    supabase
-      .from('pixxi_users')
-      .select('id, name, pixxi_user_email, primary_email, lifecycle_status, is_active')
-      .order('name', { ascending: true })
-      .then(({ data, error }) => {
-        if (error) {
-          console.warn('Lens: pixxi_users fetch error', error);
-          setPixxiUsers([]);
-        } else {
-          const users = data || [];
-          setPixxiUsers(users);
-          // Default lens to Irfan if found
-          const irfan = users.find(u =>
-            u.name?.toLowerCase().includes('irfan') ||
-            u.pixxi_user_email?.toLowerCase().includes('irfan') ||
-            u.primary_email?.toLowerCase().includes('irfan')
-          );
-          if (irfan) setLensUser(irfan);
-        }
+    base44.functions.invoke('getPixxiUsers', {})
+      .then(res => {
+        const users = res.data?.users || [];
+        setPixxiUsers(users);
+        // Default lens to Irfan if found
+        const irfan = users.find(u =>
+          u.name?.toLowerCase().includes('irfan') ||
+          u.pixxi_user_email?.toLowerCase().includes('irfan') ||
+          u.primary_email?.toLowerCase().includes('irfan')
+        );
+        if (irfan) setLensUser(irfan);
+      })
+      .catch(err => {
+        console.warn('Lens: getPixxiUsers error', err);
       });
   }, []);
 
