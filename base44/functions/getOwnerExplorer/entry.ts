@@ -49,6 +49,23 @@ async function discoverExcelTables(supabaseUrl, serviceKey) {
   } catch (_) { return []; }
 }
 
+// ── Hard-coded Normalization: Consolidate fragmented project names ──────────
+const PROJECT_NORMALIZATIONS = {
+  'Murooj Al Furjan 1': 'Murooj Al Furjan',
+  'Murooj Al Furjan 2': 'Murooj Al Furjan',
+  'Murooj Al Furjan West': 'Murooj Al Furjan',
+  'Murooj 1': 'Murooj Al Furjan',
+  'Murooj 2': 'Murooj Al Furjan',
+  'Tilal Al Furjan 1': 'Tilal Al Furjan',
+  'Tilal Al Furjan 2': 'Tilal Al Furjan',
+};
+
+function normalizeProject(projectName) {
+  if (!projectName) return projectName;
+  const trimmed = projectName.trim();
+  return PROJECT_NORMALIZATIONS[trimmed] || trimmed;
+}
+
 // ── Convert project name → likely excel table slug ───────────────────────────
 function projectToSlug(projectName) {
   return 'excel_' + projectName
@@ -125,83 +142,136 @@ Deno.serve(async (req) => {
     const allExcelTables = await discoverExcelTables(SUPABASE_URL, SERVICE_KEY);
     const excelTableSet = new Set(allExcelTables);
 
-    // ── Action: list zones ────────────────────────────────────────────────────
+    // ── Action: list zones (from actual owners only) ────────────────────────────
     if (action === 'zones') {
       const allowed = await getAllowedZones(supabase, scopeEmail, userIsAdmin, agent_email);
-      const rows = await fetchAll(agentDb, 'raco_project_intelligence', 'final_zone_name');
-      const seen = new Set();
-      const zones = [];
-      for (const r of rows) {
-        const z = r.final_zone_name;
-        if (!z || seen.has(z)) continue;
-        if (allowed !== null && !allowed.includes(z)) continue;
-        seen.add(z);
-        zones.push(z);
+      // Get all owners from master DB and extract their zones
+      const allOwners = await fetchAll(agentDb, 'raco_owner_intelligence', 'linked_zones, owner_area');
+      const zoneSet = new Set();
+      
+      for (const owner of allOwners) {
+        // Use linked_zones array if available
+        if (Array.isArray(owner.linked_zones)) {
+          for (const z of owner.linked_zones) {
+            if (z && (!allowed || allowed.includes(z))) zoneSet.add(z);
+          }
+        }
       }
-      zones.sort();
+      
+      const zones = [...zoneSet].sort();
       return Response.json({ zones });
     }
 
-    // ── Action: list master projects for a zone ───────────────────────────────
+    // ── Action: list master projects for a zone (from owners only) ────────────────
     if (action === 'master_projects') {
       if (!zone) return Response.json({ error: 'zone required' }, { status: 400 });
-      const rows = await fetchAll(agentDb, 'raco_project_intelligence', 'master_project_name', { final_zone_name: zone });
-      const seen = new Set();
-      const masters = [];
-      for (const r of rows) {
-        if (!r.master_project_name || seen.has(r.master_project_name)) continue;
-        seen.add(r.master_project_name);
-        masters.push(r.master_project_name);
+      const allOwners = await fetchAll(agentDb, 'raco_owner_intelligence', 'linked_master_project_names, owner_area, linked_zones');
+      const masterSet = new Set();
+      
+      for (const owner of allOwners) {
+        // Check if owner's linked zones include the requested zone
+        if (Array.isArray(owner.linked_zones) && owner.linked_zones.includes(zone)) {
+          if (Array.isArray(owner.linked_master_project_names)) {
+            for (const m of owner.linked_master_project_names) {
+              if (m) masterSet.add(m);
+            }
+          }
+        }
       }
-      masters.sort();
+      
+      const masters = [...masterSet].sort();
       return Response.json({ master_projects: masters });
     }
 
-    // ── Action: list buildings for a master project ───────────────────────────
+    // ── Action: list buildings for a master project (from owners only + normalized) ─
     if (action === 'projects') {
       if (!master_project) return Response.json({ error: 'master_project required' }, { status: 400 });
-      const rows = await fetchAll(agentDb, 'raco_project_intelligence', 'project', { master_project_name: master_project });
-      const seen = new Set();
-      const projects = [];
-      for (const r of rows) {
-        if (!r.project || seen.has(r.project)) continue;
-        seen.add(r.project);
-        // Mark if an Excel table exists for this project
-        const slug = projectToSlug(r.project);
-        const hasExcel = excelTableSet.has(slug) ||
-          allExcelTables.some(t => t.includes(slug.replace('excel_', '')));
-        projects.push({ name: r.project, has_excel: hasExcel });
+      const allOwners = await fetchAll(agentDb, 'raco_owner_intelligence', 'linked_projects, owner_area, linked_master_project_names');
+      const projectMap = new Map(); // normalized → { name, has_excel, variants }
+      
+      for (const owner of allOwners) {
+        // Check if owner belongs to this master project
+        let belongs = false;
+        if (Array.isArray(owner.linked_master_project_names) && owner.linked_master_project_names.includes(master_project)) {
+          belongs = true;
+        }
+        if (!belongs) continue;
+        
+        // Add owner's project (normalize it)
+        if (owner.owner_area) {
+          const normalized = normalizeProject(owner.owner_area);
+          if (!projectMap.has(normalized)) {
+            const slug = projectToSlug(normalized);
+            const hasExcel = excelTableSet.has(slug) || allExcelTables.some(t => t.includes(slug.replace('excel_', '')));
+            projectMap.set(normalized, { name: normalized, has_excel: hasExcel, variants: new Set() });
+          }
+          projectMap.get(normalized).variants.add(owner.owner_area);
+        }
+        
+        // Add linked projects
+        if (Array.isArray(owner.linked_projects)) {
+          for (const proj of owner.linked_projects) {
+            if (!proj) continue;
+            const normalized = normalizeProject(proj);
+            if (!projectMap.has(normalized)) {
+              const slug = projectToSlug(normalized);
+              const hasExcel = excelTableSet.has(slug) || allExcelTables.some(t => t.includes(slug.replace('excel_', '')));
+              projectMap.set(normalized, { name: normalized, has_excel: hasExcel, variants: new Set() });
+            }
+            projectMap.get(normalized).variants.add(proj);
+          }
+        }
       }
-      projects.sort((a, b) => a.name.localeCompare(b.name));
+      
+      const projects = [...projectMap.values()].sort((a, b) => a.name.localeCompare(b.name));
       return Response.json({ projects });
     }
 
-    // ── Action: owners by project — merge master DB + excel ──────────────────
+    // ── Action: owners by project — fetch all variants + merge master + excel ──
     if (action === 'owners_by_project') {
       if (!project) return Response.json({ error: 'project required' }, { status: 400 });
+      
+      // Normalize input and find all variants
+      const normalized = normalizeProject(project);
+      const variants = new Set([project]); // Start with input (could be normalized or raw)
+      variants.add(normalized); // Add normalized version
+      
+      // Add all mappings that normalize to this value
+      for (const [k, v] of Object.entries(PROJECT_NORMALIZATIONS)) {
+        if (v === normalized) variants.add(k);
+      }
+      
+      console.log(`[owners_by_project] Looking for: ${normalized} | variants: ${[...variants].join(', ')}`);
 
-      // 1. Master DB owners
+      // 1. Master DB owners (search all variants)
       const masterOwners = [];
-      let from = 0;
-      while (true) {
-        const { data, error } = await agentDb
-          .from('raco_owner_intelligence')
-          .select(SUMMARY_COLS)
-          .eq('owner_area', project)
-          .range(from, from + 999);
-        if (error || !data || data.length === 0) break;
-        masterOwners.push(...data.map(o => ({ ...o, source_label: 'Master DB', source_system: 'master_db' })));
-        if (data.length < 1000) break;
-        from += 1000;
+      for (const variant of variants) {
+        let from = 0;
+        while (true) {
+          const { data, error } = await agentDb
+            .from('raco_owner_intelligence')
+            .select(SUMMARY_COLS)
+            .eq('owner_area', variant)
+            .range(from, from + 999);
+          if (error || !data || data.length === 0) break;
+          masterOwners.push(...data.map(o => ({ ...o, source_label: 'Master DB', source_system: 'master_db' })));
+          if (data.length < 1000) break;
+          from += 1000;
+        }
       }
 
-      // 2. Find matching Excel tables for this project
-      const slug = projectToSlug(project);
-      const matchingExcelTables = allExcelTables.filter(t => {
-        const tClean = t.replace(/^excel_/, '');
-        const pClean = slug.replace(/^excel_/, '');
-        return tClean === pClean || tClean.startsWith(pClean) || tClean.includes(pClean);
-      });
+      // 2. Find matching Excel tables for all variants
+      const matchingExcelTables = new Set();
+      for (const variant of variants) {
+        const slug = projectToSlug(variant);
+        allExcelTables
+          .filter(t => {
+            const tClean = t.replace(/^excel_/, '');
+            const pClean = slug.replace(/^excel_/, '');
+            return tClean === pClean || tClean.startsWith(pClean) || tClean.includes(pClean);
+          })
+          .forEach(t => matchingExcelTables.add(t));
+      }
 
       const excelOwners = [];
       for (const tbl of matchingExcelTables) {
@@ -215,7 +285,7 @@ Deno.serve(async (req) => {
         count: allOwners.length,
         master_count: masterOwners.length,
         excel_count: excelOwners.length,
-        excel_tables_used: matchingExcelTables,
+        excel_tables_used: [...matchingExcelTables],
       });
     }
 

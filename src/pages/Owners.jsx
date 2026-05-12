@@ -104,12 +104,27 @@ export default function Owners() {
       .finally(() => setLoading(false));
   }
 
+  // Hard-coded normalization for fragmented project names
+  const normalizeProject = (name) => {
+    const MAP = {
+      'Murooj Al Furjan 1': 'Murooj Al Furjan',
+      'Murooj Al Furjan 2': 'Murooj Al Furjan',
+      'Murooj Al Furjan West': 'Murooj Al Furjan',
+      'Murooj 1': 'Murooj Al Furjan',
+      'Murooj 2': 'Murooj Al Furjan',
+      'Tilal Al Furjan 1': 'Tilal Al Furjan',
+      'Tilal Al Furjan 2': 'Tilal Al Furjan',
+    };
+    return MAP[name] || name;
+  };
+
   function drillProject(projectName) {
-    setSelectedProject(projectName);
+    const normalized = normalizeProject(projectName);
+    setSelectedProject(normalized);
     setOwners([]);
     setStep('owners');
     setLoading(true);
-    invoke('owners_by_project', { project: projectName })
+    invoke('owners_by_project', { project: normalized })
       .then(d => setOwners(d?.owners || []))
       .finally(() => setLoading(false));
   }
@@ -239,10 +254,12 @@ export default function Owners() {
               {projects.length === 0 ? (
                 <div className="col-span-full text-sm text-muted-foreground py-8 text-center">No buildings found in {selectedMaster}.</div>
               ) : projects.map(p => {
-                const name = typeof p === 'string' ? p : p.name;
+                const rawName = typeof p === 'string' ? p : p.name;
+                const displayName = normalizeProject(rawName);
                 const hasExcel = typeof p === 'object' && p.has_excel;
+                // Prevent duplicate tiles for normalized names
                 return (
-                  <TileButton key={name} label={name} icon={Home} color="bg-sky-tint text-sky" hasExcel={hasExcel} onClick={() => drillProject(name)} />
+                  <TileButton key={displayName} label={displayName} icon={Home} color="bg-sky-tint text-sky" hasExcel={hasExcel} onClick={() => drillProject(displayName)} />
                 );
               })}
             </div>
