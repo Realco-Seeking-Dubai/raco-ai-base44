@@ -16,19 +16,8 @@ export default function InviteUserModal({ onClose, onInvited }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    base44.functions.invoke('getWorkspaceAssignments', {})
-      .then(res => {
-        const all = res.data?.assignments || [];
-        // Deduplicate by project_name
-        const seen = new Set();
-        const unique = all.filter(r => {
-          const key = r.project_name || r.zone || r.area;
-          if (!key || seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        });
-        setProjects(unique);
-      })
+    base44.functions.invoke('getProjectList', {})
+      .then(res => setProjects(res.data?.projects || []))
       .catch(() => setProjects([]))
       .finally(() => setLoadingProjects(false));
   }, []);
@@ -125,15 +114,16 @@ export default function InviteUserModal({ onClose, onInvited }) {
                 {loadingProjects ? (
                   <div className="h-8 bg-surface rounded-lg animate-pulse" />
                 ) : projects.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No projects found in workspace assignments.</p>
+                  <p className="text-xs text-muted-foreground">No projects found in raco_project_intelligence.</p>
                 ) : (
-                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
+                  <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-1">
                     {projects.map((p, i) => {
-                      const key = p.project_name || p.zone || p.area || String(i);
+                      const key = p.master_project_name;
                       const selected = selectedProjects.includes(key);
                       return (
                         <button
                           key={i}
+                          type="button"
                           onClick={() => toggleProject(key)}
                           className={cn(
                             'text-[11px] px-2.5 py-1 rounded-full border font-medium transition-colors',
