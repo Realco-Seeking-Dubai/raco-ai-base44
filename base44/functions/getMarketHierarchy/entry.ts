@@ -1,6 +1,27 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
+// Normalize fragmented project names
+function normalizeProjectName(projectName) {
+  if (!projectName) return projectName;
+  const trimmed = projectName.trim();
+  const baseSlug = trimmed.toLowerCase()
+    .replace(/\s+\d+\s*$/, '')
+    .replace(/[^a-z0-9\s]+/g, ' ')
+    .trim();
+  const CANONICAL_NAMES = {
+    'murooj': 'Murooj Al Furjan',
+    'tilal': 'Tilal Al Furjan',
+    'damac': 'DAMAC Properties',
+    'emaar': 'Emaar',
+    'mag': 'MAG',
+  };
+  for (const [slug, canonical] of Object.entries(CANONICAL_NAMES)) {
+    if (baseSlug.startsWith(slug)) return canonical;
+  }
+  return trimmed;
+}
+
 // Admin check: look up user in user_roles table
 async function isAdmin(supabase, email) {
   try {
@@ -81,9 +102,11 @@ Deno.serve(async (req) => {
       const masters = [];
       for (const r of rows) {
         if (!r.master_project_name || r.final_zone_name !== zone) continue;
-        if (seen.has(r.master_project_name)) continue;
-        seen.add(r.master_project_name);
-        masters.push({ master_project: r.master_project_name });
+        // Normalize and deduplicate by canonical name
+        const canonical = normalizeProjectName(r.master_project_name);
+        if (seen.has(canonical)) continue;
+        seen.add(canonical);
+        masters.push({ master_project: canonical });
       }
       masters.sort((a, b) => a.master_project.localeCompare(b.master_project));
       return Response.json({ master_projects: masters });
@@ -96,10 +119,15 @@ Deno.serve(async (req) => {
       const seen = new Set();
       const buildings = [];
       for (const r of rows) {
-        if (!r.project || r.master_project_name !== master_project) continue;
-        if (seen.has(r.project)) continue;
-        seen.add(r.project);
-        buildings.push({ building: r.project, zone: r.final_zone_name });
+        if (!r.project) continue;
+        // Match both exact and normalized master project names (handles "Murooj Al Furjan" matching "Murooj 1", "Murooj 2")
+        const canonicalDbMaster = normalizeProjectName(r.master_project_name);
+        if (canonicalDbMaster !== master_project) continue;
+        
+        const canonical = normalizeProjectName(r.project);
+        if (seen.has(canonical)) continue;
+        seen.add(canonical);
+        buildings.push({ building: canonical, zone: r.final_zone_name });
       }
       buildings.sort((a, b) => a.building.localeCompare(b.building));
       return Response.json({ buildings });
@@ -108,13 +136,28 @@ Deno.serve(async (req) => {
     // ── Action: building detail (full KPIs + charts) ────────────────────────────
     if (action === 'building_detail') {
       if (!building) return Response.json({ error: 'building required' }, { status: 400 });
-      const { data, error } = await agent
+      
+      // First try exact match
+      let { data, error } = await agent
         .from('raco_project_intelligence')
         .select('*')
         .eq('project', building)
         .limit(1)
         .single();
-      if (error || !data) return Response.json({ error: 'Building not found' }, { status: 404 });
+      
+      // If not found, search for fragmented variants (e.g., "Murooj Al Furjan" → "Murooj 1")
+      if (!data) {
+        const rows = await fetchAll(agent, 'raco_project_intelligence', '*');
+        const normalized = normalizeProjectName(building);
+        for (const row of rows) {
+          if (normalizeProjectName(row.project) === normalized) {
+            data = row;
+            break;
+          }
+        }
+      }
+      
+      if (!data) return Response.json({ error: 'Building not found' }, { status: 404 });
       return Response.json({ building: data });
     }
 

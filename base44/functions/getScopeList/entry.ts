@@ -6,6 +6,35 @@ function projectToSlug(projectName) {
   return projectName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 }
 
+// Normalize fragmented project names: "Murooj 1", "Murooj 2" → "Murooj Al Furjan"
+function normalizeProjectName(projectName) {
+  if (!projectName) return projectName;
+  const trimmed = projectName.trim();
+  
+  // Strip numeric suffixes and normalize: "Murooj 1" → "murooj", "Tilal Al Furjan 2" → "tilal_al_furjan"
+  const baseSlug = trimmed.toLowerCase()
+    .replace(/\s+\d+\s*$/, '') // Remove trailing numbers
+    .replace(/[^a-z0-9\s]+/g, ' ') // Normalize special chars
+    .trim();
+  
+  // Define canonical mappings for known fragmented projects
+  const CANONICAL_NAMES = {
+    'murooj': 'Murooj Al Furjan',
+    'tilal': 'Tilal Al Furjan',
+    'damac': 'DAMAC Properties',
+    'emaar': 'Emaar',
+    'mag': 'MAG',
+  };
+  
+  // Check if slug starts with a known base
+  for (const [slug, canonical] of Object.entries(CANONICAL_NAMES)) {
+    if (baseSlug.startsWith(slug)) return canonical;
+  }
+  
+  // Fallback: return original if no mapping found
+  return trimmed;
+}
+
 // Discover all agent.excel_ table names via OpenAPI spec
 async function discoverExcelTables(supabaseUrl, serviceKey) {
   try {
@@ -85,11 +114,26 @@ Deno.serve(async (req) => {
     // Derive master projects and zones purely from the populated projects
     const masterSet = new Map(); // master_project_name → zone
     const zoneSet = new Set();
+    
+    // Track fragmented projects for consolidation
+    const fragmentedMap = new Map(); // canonical_name → [original_names]
 
     for (const proj of projectMap.values()) {
       zoneSet.add(proj.zone);
-      if (!masterSet.has(proj.master_project_name)) {
-        masterSet.set(proj.master_project_name, proj.zone);
+      
+      // Normalize master project names to consolidate fragments
+      const canonicalMaster = normalizeProjectName(proj.master_project_name);
+      if (!masterSet.has(canonicalMaster)) {
+        masterSet.set(canonicalMaster, proj.zone);
+      }
+      
+      // Track fragmentation for buildings
+      if (!fragmentedMap.has(proj.project)) {
+        const normalized = normalizeProjectName(proj.project);
+        if (!fragmentedMap.has(normalized)) {
+          fragmentedMap.set(normalized, []);
+        }
+        fragmentedMap.get(normalized).push(proj.project);
       }
     }
 
@@ -104,8 +148,15 @@ Deno.serve(async (req) => {
       .sort((a, b) => a.zone.localeCompare(b.zone));
 
     console.log(`[getScopeList] FINAL (data-driven) — zones: ${zones.length} | masterProjects: ${masterProjects.length} | projects: ${projects.length}`);
+    console.log(`[getScopeList] Fragmentation map:`, [...fragmentedMap.entries()].slice(0, 5));
 
-    return Response.json({ zones, masterProjects, projects, excel_table_count: excelTables.length });
+    return Response.json({
+      zones,
+      masterProjects,
+      projects,
+      fragmented_map: Object.fromEntries(fragmentedMap),
+      excel_table_count: excelTables.length,
+    });
   } catch (err) {
     console.error('[getScopeList] EXCEPTION:', err.message);
     return Response.json({ error: err.message }, { status: 500 });
