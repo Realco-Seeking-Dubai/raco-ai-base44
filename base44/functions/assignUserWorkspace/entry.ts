@@ -18,21 +18,45 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     );
 
-    // Build rows to insert into workspace_scope_assignments
+    // Build rows matching workspace_scope_assignments schema:
+    // columns: user_email, scope_label, zone, master_project_name, project, assigned_by, is_active
     const rows = [
-      ...zones.map(z => ({ user_email, scope_type: 'zone', scope_value: z, assigned_by: user.email })),
-      ...masterProjects.map(m => ({ user_email, scope_type: 'master_project', scope_value: m, assigned_by: user.email })),
-      ...projects.map(p => ({ user_email, scope_type: 'project', scope_value: p, assigned_by: user.email })),
+      ...zones.map(z => ({
+        user_email,
+        scope_label: z,
+        zone: z,
+        master_project_name: null,
+        project: null,
+        assigned_by: user.email,
+        is_active: true,
+      })),
+      ...masterProjects.map(m => ({
+        user_email,
+        scope_label: m,
+        zone: null,
+        master_project_name: m,
+        project: null,
+        assigned_by: user.email,
+        is_active: true,
+      })),
+      ...projects.map(p => ({
+        user_email,
+        scope_label: p,
+        zone: null,
+        master_project_name: p,
+        project: p,
+        assigned_by: user.email,
+        is_active: true,
+      })),
     ];
 
     if (rows.length === 0) {
       return Response.json({ ok: true, inserted: 0 });
     }
 
-    // Upsert to avoid duplicates (requires unique constraint on user_email + scope_type + scope_value)
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('workspace_scope_assignments')
-      .upsert(rows, { onConflict: 'user_email,scope_type,scope_value', ignoreDuplicates: true });
+      .upsert(rows, { onConflict: 'user_email,scope_label', ignoreDuplicates: true });
 
     if (error) {
       console.error('[assignUserWorkspace] Upsert error:', JSON.stringify(error));

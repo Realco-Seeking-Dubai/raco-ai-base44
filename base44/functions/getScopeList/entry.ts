@@ -7,77 +7,68 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    // Public schema client (for views that live in public schema)
     const pub = createClient(
       Deno.env.get('SUPABASE_URL'),
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     );
-
-    // Agent schema client (explicit header override)
     const agent = createClient(
       Deno.env.get('SUPABASE_URL'),
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
-      {
-        global: {
-          headers: { 'Accept-Profile': 'agent', 'Content-Profile': 'agent' }
-        }
-      }
+      { db: { schema: 'agent' } }
     );
 
-    // Fetch all three tiers in parallel
-    const [zonesRes, masterRes, projectsRes] = await Promise.all([
-      // Zones — try public schema first (v_admin_scope_projects)
+    // All three sources — v_admin_scope_projects and v_workspace_scopes are in PUBLIC schema
+    const [scopeProjectsRes, workspaceScopesRes, projectsRes] = await Promise.all([
       pub.from('v_admin_scope_projects')
-        .select('zone, area')
+        .select('zone, master_project_name, project')
         .limit(5000),
 
-      // Master projects — v_workspace_scopes
       pub.from('v_workspace_scopes')
-        .select('project_name, zone, area')
-        .not('project_name', 'is', null)
+        .select('zone, master_project_name, project')
         .limit(5000),
 
-      // Buildings/specific projects — agent schema
       agent.from('raco_project_intelligence')
-        .select('master_project_name, zone, area')
+        .select('master_project_name, area_name, final_zone_name')
         .not('master_project_name', 'is', null)
         .order('master_project_name', { ascending: true })
         .limit(5000),
     ]);
 
-    // Deduplicate zones
+    // Extract unique zones from v_admin_scope_projects
     const zonesSeen = new Set();
-    const zones = (zonesRes.data || []).filter(r => {
-      const key = r.zone || r.area;
+    const zones = (scopeProjectsRes.data || []).filter(r => {
+      const key = r.zone;
       if (!key || zonesSeen.has(key)) return false;
       zonesSeen.add(key);
       return true;
-    });
+    }).map(r => ({ zone: r.zone }));
 
-    // Deduplicate master projects
+    // Extract unique master projects from v_admin_scope_projects
     const masterSeen = new Set();
-    const masterProjects = (masterRes.data || []).filter(r => {
-      const key = r.project_name;
+    const masterProjects = (scopeProjectsRes.data || []).filter(r => {
+      const key = r.master_project_name;
       if (!key || masterSeen.has(key)) return false;
       masterSeen.add(key);
       return true;
-    });
+    }).map(r => ({ project_name: r.master_project_name, zone: r.zone }));
 
-    // Deduplicate buildings
+    // Extract unique buildings/projects from raco_project_intelligence
     const buildingSeen = new Set();
     const projects = (projectsRes.data || []).filter(r => {
       const key = r.master_project_name;
       if (!key || buildingSeen.has(key)) return false;
       buildingSeen.add(key);
       return true;
-    });
+    }).map(r => ({ master_project_name: r.master_project_name, zone: r.final_zone_name, area: r.area_name }));
 
     console.log('[getScopeList] zones:', zones.length, '| masterProjects:', masterProjects.length, '| projects:', projects.length);
-    console.log('[getScopeList] zones error:', zonesRes.error?.message, '| master error:', masterRes.error?.message, '| projects error:', projectsRes.error?.message);
+    console.log('[getScopeList] scopeProjects error:', scopeProjectsRes.error?.message || 'none');
+    console.log('[getScopeList] workspaceScopes error:', workspaceScopesRes.error?.message || 'none');
+    console.log('[getScopeList] projects error:', projectsRes.error?.message || 'none');
 
     return Response.json({ zones, masterProjects, projects });
   } catch (err) {
-    console.error('[getScopeList]', err.message);
+    console.error('[getScopeList] EXCEPTION:', err.message);
     return Response.json({ error: err.message }, { status: 500 });
   }
 });
