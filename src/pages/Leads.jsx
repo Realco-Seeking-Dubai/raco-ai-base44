@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { getLeads, getPixxiListings, getPixxiUsers } from '@/lib/supabase';
+import { getPixxiListings } from '@/lib/supabase';
+import { base44 } from '@/api/base44Client';
 import { useLens } from '@/lib/LensContext';
 import PageHeader from '@/components/ui/PageHeader';
 import StatusBadge from '@/components/ui/StatusBadge';
@@ -50,16 +51,17 @@ export default function Leads() {
   function loadData() {
     setLoading(true);
     Promise.all([
-      getLeads(lensEmail),
+      base44.functions.invoke('getLeads', { agent_email: lensEmail || undefined }),
       getPixxiListings(lensEmail, { filterByAgent: false }),
-      getPixxiUsers(),
-    ]).then(([leadsData, listingsData, agentsData]) => {
+      base44.functions.invoke('getPixxiUsers', {}),
+    ]).then(([leadsRes, listingsData, agentsRes]) => {
+      const leadsData = leadsRes?.data?.leads || [];
       const scored = leadsData.map(l => ({ ...l, _score: computeLeadScore(l) }));
       scored.sort((a, b) => b._score - a._score);
       setLeads(scored);
       setListings(listingsData);
-      const activeAgents = (agentsData || []).filter(a => a.lifecycle_status === 'active' || a.is_active);
-      setAgents(activeAgents);
+      const allAgents = agentsRes?.data?.users || [];
+      setAgents(allAgents);
       setLoading(false);
     }).catch(err => {
       console.error('Leads data error:', err);

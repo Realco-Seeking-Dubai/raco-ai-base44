@@ -12,13 +12,12 @@ export function LensProvider({ children }) {
       .then(res => {
         const users = res.data?.users || [];
         setPixxiUsers(users);
-        // Default lens to Irfan if found
-        const irfan = users.find(u =>
-          u.name?.toLowerCase().includes('irfan') ||
-          u.pixxi_user_email?.toLowerCase().includes('irfan') ||
-          u.primary_email?.toLowerCase().includes('irfan')
+        // Default lens to Junaid (most leads = 232) for richest test data
+        const defaultUser = users.find(u =>
+          u.pixxi_user_email === 'junaid@realcocapital.ae' ||
+          u.name?.toLowerCase().includes('junaid')
         );
-        if (irfan) setLensUser(irfan);
+        if (defaultUser) setLensUser(defaultUser);
       })
       .catch(err => {
         console.warn('Lens: getPixxiUsers error', err);
