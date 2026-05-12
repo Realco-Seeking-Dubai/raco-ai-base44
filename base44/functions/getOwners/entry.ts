@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
     // Mandatory: look up v_workspace_assignments
     const { data: wsRows, error: wsError } = await supabase
       .from('v_workspace_assignments')
-      .select('project_name, zone, area')
+      .select('zone, area')
       .eq('user_email', scopeEmail);
 
     if (wsError) {
@@ -76,9 +76,8 @@ Deno.serve(async (req) => {
 
     // Collect zones and areas to filter owners
     const assignedZones = [...new Set(wsRows.flatMap(r => [r.zone, r.area]).filter(Boolean))];
-    const assignedProjects = [...new Set(wsRows.map(r => r.project_name).filter(Boolean))];
 
-    if (assignedZones.length === 0 && assignedProjects.length === 0) {
+    if (assignedZones.length === 0) {
       console.log('[getOwners] Empty assignments for', scopeEmail);
       return Response.json({ owners: [], is_global: false, reason: 'no_scope' });
     }
