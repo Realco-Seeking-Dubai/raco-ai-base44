@@ -63,9 +63,9 @@ Deno.serve(async (req) => {
     const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const agent = createClient(SUPABASE_URL, SERVICE_KEY, { db: { schema: 'agent' } });
 
-    // Fetch projects with simple limit
+    // Fetch all projects (no limit) for admin/user creation
     const [intelligenceRes, excelTables] = await Promise.all([
-      agent.from('raco_project_intelligence').select('final_zone_name, master_project_name, project').limit(1000),
+      agent.from('raco_project_intelligence').select('final_zone_name, master_project_name, project'),
       discoverExcelTables(SUPABASE_URL, SERVICE_KEY),
     ]);
 
