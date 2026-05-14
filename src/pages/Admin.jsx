@@ -8,10 +8,10 @@ import EmptyState from '@/components/ui/EmptyState';
 import UserLifecycleActions from '@/components/admin/UserLifecycleActions';
 import UserDetailPanel from '@/components/admin/UserDetailPanel';
 import InviteUserModal from '@/components/admin/InviteUserModal';
-import { Users, Search, RefreshCw, ChevronRight, UserPlus } from 'lucide-react';
+import { Users, Search, RefreshCw, ChevronRight, UserPlus, DatabaseZap, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const TABS = ['Users', 'Scope Map'];
+const TABS = ['Users', 'Scope Map', 'Pocket Sync'];
 
 export default function Admin() {
   const { isAdmin } = useAuth();
@@ -161,6 +161,10 @@ export default function Admin() {
         <ScopeMap />
       )}
 
+      {tab === 'Pocket Sync' && (
+        <PocketSync />
+      )}
+
       {selectedUser && (
         <UserDetailPanel
           user={selectedUser}
@@ -172,6 +176,168 @@ export default function Admin() {
       {showInvite && (
         <InviteUserModal onClose={() => setShowInvite(false)} onInvited={loadUsers} />
       )}
+    </div>
+  );
+}
+
+// ── Pocket Sync tab ──────────────────────────────────────────────────────────
+function PocketSync() {
+  const [status, setStatus] = useState(null); // null | 'running' | 'done' | 'error'
+  const [result, setResult] = useState(null);
+  const [dryRun, setDryRun] = useState(false);
+
+  async function runSync() {
+    setStatus('running');
+    setResult(null);
+    try {
+      const res = await base44.functions.invoke('syncPocketListings', { dry_run: dryRun });
+      setResult(res.data);
+      setStatus(res.data?.success ? 'done' : 'error');
+    } catch (err) {
+      setResult({ error: err.message });
+      setStatus('error');
+    }
+  }
+
+  const statCard = (label, value, color = 'text-foreground') => (
+    <div className="bg-surface rounded-lg px-4 py-3 text-center">
+      <div className={cn('text-2xl font-bold tabular-nums', color)}>{value ?? '—'}</div>
+      <div className="text-xs text-muted-foreground mt-0.5">{label}</div>
+    </div>
+  );
+
+  return (
+    <div className="max-w-2xl space-y-5">
+      {/* Info card */}
+      <div className="bg-card border border-hairline rounded-xl p-5">
+        <div className="flex items-center gap-2 mb-2">
+          <DatabaseZap className="w-4 h-4 text-evergreen" />
+          <span className="text-sm font-semibold text-foreground">Sync Pocket Listings from 13.realco.ai</span>
+        </div>
+        <p className="text-xs text-muted-foreground mb-4">
+          Pulls all <strong>Listing</strong> records from the source app (5 agents, ~311 records) and upserts them into
+          <code className="mx-1 px-1 py-0.5 rounded bg-surface text-xs">agent.realco13_pocket_listings</code>
+          in Supabase, resolving Zone → Community → Building hierarchy via Raco CRM project intelligence.
+        </p>
+
+        <div className="flex items-center gap-3 mb-4">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={dryRun}
+              onChange={e => setDryRun(e.target.checked)}
+              className="rounded border-hairline accent-evergreen"
+            />
+            <span className="text-xs text-muted-foreground">Dry run (preview only, no writes)</span>
+          </label>
+        </div>
+
+        <button
+          onClick={runSync}
+          disabled={status === 'running'}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-evergreen text-white text-sm font-medium hover:bg-evergreen-mid transition-colors disabled:opacity-50"
+        >
+          {status === 'running'
+            ? <><Loader2 className="w-4 h-4 animate-spin" /> Syncing…</>
+            : <><DatabaseZap className="w-4 h-4" /> {dryRun ? 'Run Dry Run' : 'Run Sync Now'}</>
+          }
+        </button>
+      </div>
+
+      {/* Result */}
+      {result && (
+        <div className={cn('bg-card border rounded-xl p-5', status === 'error' ? 'border-terracotta/40' : 'border-evergreen/30')}>
+          <div className="flex items-center gap-2 mb-4">
+            {status === 'done'
+              ? <CheckCircle2 className="w-4 h-4 text-evergreen" />
+              : <AlertCircle className="w-4 h-4 text-terracotta" />}
+            <span className="text-sm font-semibold">
+              {status === 'done' ? (result.dry_run ? 'Dry Run Complete' : 'Sync Complete') : 'Sync Failed'}
+            </span>
+          </div>
+
+          {result.error ? (
+            <p className="text-xs text-terracotta font-mono">{result.error}</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                {statCard('Total Records', result.total ?? result.synced, 'text-foreground')}
+                {statCard('Zone Resolved', result.resolved_zone, 'text-evergreen')}
+                {statCard('Unresolved', (result.total ?? result.synced) - (result.resolved_zone ?? 0), 'text-brass')}
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-4 text-xs">
+                {result.by_agent && (
+                  <div>
+                    <div className="font-medium text-foreground mb-1.5">By Agent</div>
+                    {Object.entries(result.by_agent).map(([k, v]) => (
+                      <div key={k} className="flex justify-between py-0.5 text-muted-foreground">
+                        <span>{k}</span><span className="font-medium text-foreground">{v}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {result.by_zone && (
+                  <div>
+                    <div className="font-medium text-foreground mb-1.5">By Zone</div>
+                    {Object.entries(result.by_zone).map(([k, v]) => (
+                      <div key={k} className="flex justify-between py-0.5 text-muted-foreground">
+                        <span>{k}</span><span className="font-medium text-foreground">{v}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* DDL hint */}
+      <details className="bg-surface border border-hairline rounded-xl overflow-hidden">
+        <summary className="px-4 py-3 text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground">
+          Supabase DDL — run once to create the table
+        </summary>
+        <pre className="px-4 pb-4 text-[10px] text-muted-foreground overflow-x-auto whitespace-pre">{`CREATE TABLE IF NOT EXISTS agent.realco13_pocket_listings (
+  id                  BIGSERIAL PRIMARY KEY,
+  source_id           TEXT UNIQUE NOT NULL,
+  source_system       TEXT DEFAULT 'realco13',
+  agent_email         TEXT,
+  agent_name          TEXT,
+  client_id           TEXT,
+  unit_address        TEXT,
+  building            TEXT,
+  master_project      TEXT,
+  zone                TEXT,
+  community_id_src    TEXT,
+  sub_project_id_src  TEXT,
+  property_category   TEXT,
+  listing_purpose     TEXT,
+  pipeline_stage      TEXT,
+  pipeline_sub_status TEXT,
+  bedrooms            INTEGER,
+  bua_sqft            NUMERIC,
+  plot_size_sqft      NUMERIC,
+  asking_price_aed    NUMERIC,
+  rental_amount_aed   NUMERIC,
+  rental_period       TEXT,
+  is_hot              BOOLEAN DEFAULT FALSE,
+  is_exclusive        BOOLEAN DEFAULT FALSE,
+  is_new              BOOLEAN DEFAULT FALSE,
+  viewing_status      TEXT,
+  follow_up_date      DATE,
+  source_record_id    TEXT,
+  source_section      TEXT,
+  notes               TEXT,
+  source_created_at   TIMESTAMPTZ,
+  source_updated_at   TIMESTAMPTZ,
+  synced_at           TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_r13pl_zone    ON agent.realco13_pocket_listings(zone);
+CREATE INDEX IF NOT EXISTS idx_r13pl_master  ON agent.realco13_pocket_listings(master_project);
+CREATE INDEX IF NOT EXISTS idx_r13pl_agent   ON agent.realco13_pocket_listings(agent_email);
+CREATE INDEX IF NOT EXISTS idx_r13pl_stage   ON agent.realco13_pocket_listings(pipeline_stage);`}</pre>
+      </details>
     </div>
   );
 }
