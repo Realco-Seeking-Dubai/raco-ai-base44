@@ -97,18 +97,20 @@ export default function Owners() {
     setOwners([]);
     setStep('master_projects');
     setLoading(true);
+    // master_projects now returns array of { name, owner_count, project_count }
     invoke('master_projects', { zone })
       .then(d => setMasterProjects(d?.master_projects || []))
       .finally(() => setLoading(false));
   }
 
   function drillMaster(master) {
-    setSelectedMaster(master);
+    const masterName = typeof master === 'string' ? master : master.name;
+    setSelectedMaster(masterName);
     setSelectedProject(null);
     setOwners([]);
     setStep('projects');
     setLoading(true);
-    invoke('projects', { master_project: master })
+    invoke('projects', { master_project: masterName })
       .then(d => setProjects(d?.projects || []))
       .finally(() => setLoading(false));
   }
@@ -256,9 +258,13 @@ export default function Owners() {
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {masterProjects.length === 0 ? (
                 <div className="col-span-full text-sm text-muted-foreground py-8 text-center">No communities found in {selectedZone}.</div>
-              ) : masterProjects.map(m => (
-                <TileButton key={m} label={m} icon={Building2} color="bg-brass-tint text-brass" onClick={() => drillMaster(m)} />
-              ))}
+              ) : masterProjects.map(m => {
+                const name = typeof m === 'string' ? m : m.name;
+                const ownerCount = typeof m === 'object' ? m.owner_count : null;
+                return (
+                  <TileButton key={name} label={name} icon={Building2} color="bg-brass-tint text-brass" stat={ownerCount} onClick={() => drillMaster(name)} />
+                );
+              })}
             </div>
           ) : step === 'projects' ? (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -268,9 +274,9 @@ export default function Owners() {
                 const rawName = typeof p === 'string' ? p : p.name;
                 const displayName = normalizeProject(rawName);
                 const hasExcel = typeof p === 'object' && p.has_excel;
-                // Prevent duplicate tiles for normalized names
+                const ownerCount = typeof p === 'object' ? p.owner_count : null;
                 return (
-                  <TileButton key={displayName} label={displayName} icon={Home} color="bg-sky-tint text-sky" hasExcel={hasExcel} onClick={() => drillProject(displayName)} />
+                  <TileButton key={displayName} label={displayName} icon={Home} color="bg-sky-tint text-sky" hasExcel={hasExcel} stat={ownerCount} onClick={() => drillProject(displayName)} />
                 );
               })}
             </div>

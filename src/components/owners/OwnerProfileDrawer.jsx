@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { X, Phone, Mail, Building2, MapPin, Loader2, RefreshCw, ShieldCheck, Hash, Layers } from 'lucide-react';
+import { X, Phone, Mail, Building2, MapPin, Loader2, RefreshCw, ShieldCheck, Hash, Layers, MessageSquare, ArrowLeftRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 function InfoRow({ label, value, mono = false }) {
@@ -29,14 +29,22 @@ function ConfidenceBar({ score }) {
 
 export default function OwnerProfileDrawer({ ownerId, onClose }) {
   const [owner, setOwner] = useState(null);
+  const [notes, setNotes] = useState([]);
+  const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!ownerId) return;
     setLoading(true);
     setOwner(null);
+    setNotes([]);
+    setTransactions([]);
     base44.functions.invoke('getOwnerExplorer', { action: 'owner_profile', owner_id: ownerId })
-      .then(res => setOwner(res.data?.owner || null))
+      .then(res => {
+        setOwner(res.data?.owner || null);
+        setNotes(res.data?.notes || []);
+        setTransactions(res.data?.transactions || []);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [ownerId]);
@@ -204,6 +212,55 @@ export default function OwnerProfileDrawer({ ownerId, onClose }) {
                 <div className="space-y-1 max-h-52 overflow-y-auto">
                   {owner.linked_projects.filter(Boolean).map((p, i) => (
                     <div key={i} className="text-xs px-2 py-1.5 rounded bg-surface text-foreground">{p}</div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* CRM Notes / Interaction Timeline */}
+            {notes.length > 0 && (
+              <div>
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                  <MessageSquare className="w-3.5 h-3.5" /> Interaction Notes ({notes.length})
+                </div>
+                <div className="space-y-2 max-h-52 overflow-y-auto">
+                  {notes.map(n => (
+                    <div key={n.id} className="bg-surface rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-1 gap-2">
+                        {n.note_type && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-evergreen-tint text-evergreen font-medium">{n.note_type}</span>
+                        )}
+                        <span className="text-[10px] text-muted-2 ml-auto">{new Date(n.created_at).toLocaleDateString('en-AE', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                      </div>
+                      <p className="text-xs text-foreground">{n.note}</p>
+                      {n.follow_up_date && (
+                        <p className="text-[10px] text-brass mt-1">Follow-up: {new Date(n.follow_up_date).toLocaleDateString('en-AE', { day: 'numeric', month: 'short' })}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Transaction History */}
+            {transactions.length > 0 && (
+              <div>
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                  <ArrowLeftRight className="w-3.5 h-3.5" /> Transactions ({transactions.length})
+                </div>
+                <div className="space-y-2 max-h-52 overflow-y-auto">
+                  {transactions.map(t => (
+                    <div key={t.id} className="bg-surface rounded-lg p-3 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-xs font-medium text-foreground truncate">{t.project_name || t.area_name || '—'}</div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">{t.transaction_type} · {t.transaction_date ? new Date(t.transaction_date).toLocaleDateString('en-AE', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</div>
+                      </div>
+                      {t.amount && (
+                        <div className="text-xs font-semibold text-evergreen tabular-nums shrink-0">
+                          AED {Number(t.amount).toLocaleString()}
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>
