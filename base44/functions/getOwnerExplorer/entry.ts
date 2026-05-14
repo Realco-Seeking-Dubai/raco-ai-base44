@@ -141,7 +141,7 @@ Deno.serve(async (req) => {
           .from('raco_owner_intelligence')
           .select('linked_zones')
           .not('linked_zones', 'is', null)
-          .limit(5000),
+          .limit(200000),
       ]);
 
       // Collect distinct zone names
@@ -182,7 +182,7 @@ Deno.serve(async (req) => {
           .from('raco_owner_intelligence')
           .select('linked_master_project_names')
           .not('linked_master_project_names', 'is', null)
-          .limit(5000),
+          .limit(200000),
       ]);
 
       if (projRes.error || !projRes.data) return Response.json({ master_projects: [] });
