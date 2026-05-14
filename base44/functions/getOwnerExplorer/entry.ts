@@ -121,52 +121,41 @@ Deno.serve(async (req) => {
     const userIsAdmin  = adminByRole || adminByTable;
     const scopeEmail   = userIsAdmin && agent_email ? agent_email : user.email;
 
-    // Discover Excel tables once per request
-    const allExcelTables = await discoverExcelTables(SUPABASE_URL, SERVICE_KEY);
+    // Only discover Excel tables for actions that actually need them
+    const needsExcel = ['projects', 'owners_by_project', 'search'].includes(action);
+    const allExcelTables = needsExcel ? await discoverExcelTables(SUPABASE_URL, SERVICE_KEY) : [];
     const excelTableSet  = new Set(allExcelTables);
 
     // ── TIER 1: Zones with owner counts ──────────────────────────────────────
-    // Uses SQL-level aggregation via RPC if available, else JS aggregation.
-    // Fetches all pages to avoid under-counting.
+    // Uses the pre-calculated public view v_zone_owner_counts if available,
+    // otherwise falls back to raco_project_intelligence for zone names only.
     if (action === 'zones') {
-      const PAGE = 1000;
-      const zoneCountMap = new Map();
-      let from = 0;
+      // Try the pre-calculated view first (fast, single query)
+      const { data: viewData } = await publicDb
+        .from('v_zone_owner_counts')
+        .select('zone_name, owner_count')
+        .order('owner_count', { ascending: false })
+        .limit(100)
+        .then(r => r)
+        .catch(() => ({ data: null }));
 
-      // Paginate through ALL owner intelligence rows to get accurate counts
-      while (true) {
-        const { data, error } = await agentDb
-          .from('raco_owner_intelligence')
-          .select('linked_zones')
-          .range(from, from + PAGE - 1);
-        if (error || !data || data.length === 0) break;
-        for (const row of data) {
-          const zones = Array.isArray(row.linked_zones) ? row.linked_zones : [];
-          for (const z of zones) {
-            if (z) zoneCountMap.set(z, (zoneCountMap.get(z) || 0) + 1);
-          }
-        }
-        if (data.length < PAGE) break;
-        from += PAGE;
+      if (viewData && viewData.length > 0) {
+        const zone_stats = viewData.map(r => ({ zone: r.zone_name, owner_count: r.owner_count || 0 }));
+        console.log(`[getOwnerExplorer] zones (view) | total: ${zone_stats.length}`);
+        return Response.json({ zones: zone_stats.map(z => z.zone), zone_stats });
       }
 
-      // Supplement with zones from project intelligence (zero-count zones still appear)
+      // Fallback: get zone names from project intelligence (no counts)
       const { data: projZones } = await agentDb
         .from('raco_project_intelligence')
         .select('final_zone_name')
         .not('final_zone_name', 'is', null)
         .limit(2000);
-      for (const p of (projZones || [])) {
-        if (p.final_zone_name && !zoneCountMap.has(p.final_zone_name)) {
-          zoneCountMap.set(p.final_zone_name, 0);
-        }
-      }
 
-      const zone_stats = [...zoneCountMap.entries()]
-        .map(([zone, owner_count]) => ({ zone, owner_count }))
-        .sort((a, b) => b.owner_count - a.owner_count || a.zone.localeCompare(b.zone));
+      const zoneSet = new Set((projZones || []).map(p => p.final_zone_name).filter(Boolean));
+      const zone_stats = [...zoneSet].map(zone => ({ zone, owner_count: 0 })).sort((a, b) => a.zone.localeCompare(b.zone));
 
-      console.log(`[getOwnerExplorer] zones | total: ${zone_stats.length} | top: ${zone_stats[0]?.zone} (${zone_stats[0]?.owner_count})`);
+      console.log(`[getOwnerExplorer] zones (fallback) | total: ${zone_stats.length}`);
       return Response.json({ zones: zone_stats.map(z => z.zone), zone_stats });
     }
 
@@ -252,24 +241,13 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Get owner counts per project — try .contains first (exact), fall back to owner_area ilike
+      // Get owner counts per project — all in one parallel batch (contains only, fast)
       await Promise.all([...projectMap.keys()].map(async (pName) => {
-        const { count: exactCount } = await agentDb
+        const { count } = await agentDb
           .from('raco_owner_intelligence')
           .select('id', { count: 'exact', head: true })
           .contains('linked_projects', [pName]);
-
-        if (exactCount && exactCount > 0) {
-          projectMap.get(pName).owner_count = exactCount;
-          return;
-        }
-
-        // Fallback: count by owner_area case-insensitive
-        const { count: areaCount } = await agentDb
-          .from('raco_owner_intelligence')
-          .select('id', { count: 'exact', head: true })
-          .ilike('owner_area', pName);
-        projectMap.get(pName).owner_count = areaCount || 0;
+        projectMap.get(pName).owner_count = count || 0;
       }));
 
       const projectList = [...projectMap.values()]
