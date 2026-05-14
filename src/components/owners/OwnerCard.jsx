@@ -1,4 +1,4 @@
-import { Phone, Mail, Building2, MapPin, Database, FileSpreadsheet } from 'lucide-react';
+import { Phone, Mail, Building2, MapPin, Database, FileSpreadsheet, RefreshCw, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 function SourceBadge({ sourceLabel, sourceSystem }) {
@@ -10,16 +10,26 @@ function SourceBadge({ sourceLabel, sourceSystem }) {
         ? 'bg-brass-tint text-brass border border-brass/20'
         : 'bg-evergreen-tint text-evergreen border border-evergreen/20'
     )}>
-      {isExcel
-        ? <FileSpreadsheet className="w-2.5 h-2.5" />
-        : <Database className="w-2.5 h-2.5" />
-      }
+      {isExcel ? <FileSpreadsheet className="w-2.5 h-2.5" /> : <Database className="w-2.5 h-2.5" />}
       {isExcel ? (sourceLabel || 'Excel') : 'Master DB'}
     </span>
   );
 }
 
+function ConfidenceDot({ score }) {
+  if (score == null) return null;
+  const color = score >= 0.8 ? 'bg-evergreen' : score >= 0.5 ? 'bg-brass' : 'bg-terracotta';
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+      <span className={cn('w-1.5 h-1.5 rounded-full', color)} />
+      {Math.round(score * 100)}% confidence
+    </span>
+  );
+}
+
 export default function OwnerCard({ owner, onClick }) {
+  const reconnectSoon = owner.reconnect_due_at && new Date(owner.reconnect_due_at) <= new Date(Date.now() + 7 * 86400000);
+
   return (
     <button
       onClick={() => onClick(owner)}
@@ -33,13 +43,17 @@ export default function OwnerCard({ owner, onClick }) {
         <SourceBadge sourceLabel={owner.source_label} sourceSystem={owner.source_system} />
       </div>
 
-      {/* Area */}
-      {owner.owner_area && (
-        <div className="flex items-center gap-1 mb-2">
-          <MapPin className="w-3 h-3 text-muted-foreground shrink-0" />
-          <span className="text-[11px] text-muted-foreground truncate">{owner.owner_area}</span>
-          {owner.building_name && owner.building_name !== owner.owner_area && (
-            <span className="text-[11px] text-muted-2 truncate">· {owner.building_name}</span>
+      {/* Area + property ID */}
+      {(owner.owner_area || owner.property_id) && (
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
+          {owner.owner_area && (
+            <div className="flex items-center gap-1">
+              <MapPin className="w-3 h-3 text-muted-foreground shrink-0" />
+              <span className="text-[11px] text-muted-foreground truncate">{owner.owner_area}</span>
+            </div>
+          )}
+          {owner.property_id && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface text-muted-2 font-mono">{owner.property_id}</span>
           )}
         </div>
       )}
@@ -59,15 +73,21 @@ export default function OwnerCard({ owner, onClick }) {
       </div>
 
       {/* Footer stats */}
-      <div className="flex gap-3 mt-3 pt-2.5 border-t border-hairline text-[11px] text-muted-foreground flex-wrap">
-        {owner.flat_number && (
-          <span>Unit {owner.flat_number}{owner.floor ? `, Fl ${owner.floor}` : ''}</span>
-        )}
+      <div className="flex items-center gap-3 mt-3 pt-2.5 border-t border-hairline text-[11px] text-muted-foreground flex-wrap">
         {owner.owner_record_count != null && (
           <span className="flex items-center gap-1"><Building2 className="w-3 h-3" />{owner.owner_record_count} records</span>
         )}
+        {owner.linked_project_count != null && owner.linked_project_count > 0 && (
+          <span>{owner.linked_project_count} projects</span>
+        )}
         {owner.linked_zones?.length > 0 && (
           <span>{owner.linked_zones.slice(0, 2).join(', ')}</span>
+        )}
+        <ConfidenceDot score={owner.owner_confidence} />
+        {reconnectSoon && (
+          <span className="flex items-center gap-1 text-brass font-medium">
+            <RefreshCw className="w-2.5 h-2.5" /> Reconnect due
+          </span>
         )}
       </div>
     </button>

@@ -135,31 +135,53 @@ Deno.serve(async (req) => {
     const userIsAdmin = adminByRole || adminByTable;
     const scopeEmail = userIsAdmin && agent_email ? agent_email : user.email;
 
-    const SUMMARY_COLS = 'id, owner_id, owner_name, email, mobile, owner_area, source_system, owner_record_count, linked_project_count, linked_zones';
-    const OWNER_COLS = 'id, owner_id, owner_name, email, mobile, owner_area, source_system, owner_record_count, linked_project_count, linked_projects, linked_master_project_names, linked_zones, linked_areas, property_id, last_approached_at, last_responded_at';
+    const SUMMARY_COLS = 'id, owner_id, owner_name, normalized_owner_name, email, mobile, owner_area, source_system, owner_record_count, linked_project_count, linked_zones, linked_areas, owner_confidence, reconnect_due_at, property_id';
+    const OWNER_COLS = 'id, owner_id, owner_name, normalized_owner_name, identity_key, email, mobile, owner_area, source_system, owner_record_count, linked_project_count, linked_projects, linked_master_project_names, linked_zones, linked_areas, property_id, owner_confidence, last_approached_at, last_responded_at, reconnect_due_at, project_match_methods';
 
     // Discover all Excel table slugs once (cached in memory during the request)
     const allExcelTables = await discoverExcelTables(SUPABASE_URL, SERVICE_KEY);
     const excelTableSet = new Set(allExcelTables);
 
-    // ── Action: list zones (from project_intelligence) ──────────────────────────
+    // ── Action: list zones with owner counts from raco_owner_intelligence ──────
     if (action === 'zones') {
-      // Fetch zones from project_intelligence with simple limit
-      const { data: projects, error } = await agentDb
+      // Get distinct zones from owner intelligence (primary source)
+      const { data: ownerZones, error: ozError } = await agentDb
+        .from('raco_owner_intelligence')
+        .select('linked_zones, owner_area')
+        .limit(5000);
+
+      // Also get zones from project_intelligence as fallback
+      const { data: projZones } = await agentDb
         .from('raco_project_intelligence')
         .select('final_zone_name')
         .limit(1000);
-      
-      if (error || !projects) return Response.json({ zones: [] });
-      
-      const zoneSet = new Set();
-      for (const p of projects) {
-        if (p.final_zone_name) zoneSet.add(p.final_zone_name);
+
+      if (ozError && !projZones) return Response.json({ zones: [] });
+
+      // Build zone → owner count map from owner intelligence
+      const zoneCountMap = new Map();
+
+      // From linked_zones arrays
+      for (const row of (ownerZones || [])) {
+        const zones = Array.isArray(row.linked_zones) ? row.linked_zones : [];
+        for (const z of zones) {
+          if (z) zoneCountMap.set(z, (zoneCountMap.get(z) || 0) + 1);
+        }
       }
-      
-      const zones = [...zoneSet].sort();
+
+      // Also add zones from project intelligence that may not be in owner data
+      for (const p of (projZones || [])) {
+        if (p.final_zone_name && !zoneCountMap.has(p.final_zone_name)) {
+          zoneCountMap.set(p.final_zone_name, 0);
+        }
+      }
+
+      const zones = [...zoneCountMap.entries()]
+        .map(([zone, owner_count]) => ({ zone, owner_count }))
+        .sort((a, b) => b.owner_count - a.owner_count || a.zone.localeCompare(b.zone));
+
       console.log(`[getOwnerExplorer] zones | count: ${zones.length}`);
-      return Response.json({ zones });
+      return Response.json({ zones: zones.map(z => z.zone), zone_stats: zones });
     }
 
     // ── Action: list master projects for a zone ─────────────────────────────────

@@ -20,7 +20,7 @@ function GridSkeleton({ n = 6 }) {
   );
 }
 
-function TileButton({ label, icon: Icon, color = 'bg-evergreen-tint text-evergreen', onClick, hasExcel = false }) {
+function TileButton({ label, icon: Icon, color = 'bg-evergreen-tint text-evergreen', onClick, hasExcel = false, stat = null }) {
   return (
     <button
       onClick={onClick}
@@ -30,6 +30,11 @@ function TileButton({ label, icon: Icon, color = 'bg-evergreen-tint text-evergre
         <div className="text-sm font-semibold text-foreground group-hover:text-evergreen transition-colors leading-tight">{label}</div>
         <Icon className="w-4 h-4 text-muted-foreground group-hover:text-evergreen transition-colors shrink-0 mt-0.5" />
       </div>
+      {stat != null && (
+        <div className="mt-1.5 text-xs text-muted-foreground tabular-nums">
+          {stat.toLocaleString()} owners
+        </div>
+      )}
       {hasExcel && (
         <div className="mt-2 inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-brass-tint text-brass border border-brass/20 font-medium">
           <FileSpreadsheet className="w-2.5 h-2.5" /> Special 2025 data
@@ -50,6 +55,7 @@ export default function Owners() {
 
   // Data
   const [zones, setZones] = useState([]);
+  const [zoneStats, setZoneStats] = useState([]);
   const [masterProjects, setMasterProjects] = useState([]);
   const [projects, setProjects] = useState([]);
   const [owners, setOwners] = useState([]);
@@ -76,7 +82,10 @@ export default function Owners() {
   useEffect(() => {
     setLoading(true);
     invoke('zones')
-      .then(d => setZones(d?.zones || []))
+      .then(d => {
+        setZones(d?.zones || []);
+        setZoneStats(d?.zone_stats || []);
+      })
       .finally(() => setLoading(false));
   }, [lensUser]);
 
@@ -229,15 +238,19 @@ export default function Owners() {
             <GridSkeleton n={6} />
           ) : step === 'zones' ? (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {zones.map(zone => (
-                <TileButton
-                  key={zone}
-                  label={zone}
-                  icon={MapPin}
-                  color={ZONE_COLORS[zone] || 'bg-surface-2 text-muted-foreground'}
-                  onClick={() => drillZone(zone)}
-                />
-              ))}
+              {zones.map(zone => {
+                const stat = zoneStats.find(z => z.zone === zone);
+                return (
+                  <TileButton
+                    key={zone}
+                    label={zone}
+                    icon={MapPin}
+                    color={ZONE_COLORS[zone] || 'bg-surface-2 text-muted-foreground'}
+                    onClick={() => drillZone(zone)}
+                    stat={stat?.owner_count || null}
+                  />
+                );
+              })}
             </div>
           ) : step === 'master_projects' ? (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
