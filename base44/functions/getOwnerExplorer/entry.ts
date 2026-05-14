@@ -126,66 +126,69 @@ Deno.serve(async (req) => {
     const allExcelTables = needsExcel ? await discoverExcelTables(SUPABASE_URL, SERVICE_KEY) : [];
     const excelTableSet  = new Set(allExcelTables);
 
-    // ── TIER 1: Zones with owner counts ──────────────────────────────────────
-    // Uses the pre-calculated public view v_zone_owner_counts if available,
-    // otherwise falls back to raco_project_intelligence for zone names only.
+    // ── TIER 1: Zones ────────────────────────────────────────────────────────
+    // Source of truth: agent.raco_project_intelligence (DISTINCT final_zone_name)
+    // Owner counts: agent.raco_owner_intelligence grouped by linked_zones
     if (action === 'zones') {
-      // Try the pre-calculated view first (fast, single query)
-      const { data: viewData } = await publicDb
-        .from('v_zone_owner_counts')
-        .select('zone_name, owner_count')
-        .order('owner_count', { ascending: false })
-        .limit(100)
-        .then(r => r)
-        .catch(() => ({ data: null }));
+      // Fetch distinct zones and zone→owner counts in parallel
+      const [zonesRes, ownerZonesRes] = await Promise.all([
+        agentDb
+          .from('raco_project_intelligence')
+          .select('final_zone_name')
+          .not('final_zone_name', 'is', null)
+          .limit(2000),
+        agentDb
+          .from('raco_owner_intelligence')
+          .select('linked_zones')
+          .not('linked_zones', 'is', null)
+          .limit(5000),
+      ]);
 
-      if (viewData && viewData.length > 0) {
-        const zone_stats = viewData.map(r => ({ zone: r.zone_name, owner_count: r.owner_count || 0 }));
-        console.log(`[getOwnerExplorer] zones (view) | total: ${zone_stats.length}`);
-        return Response.json({ zones: zone_stats.map(z => z.zone), zone_stats });
+      // Collect distinct zone names
+      const zoneSet = new Set(
+        (zonesRes.data || []).map(p => p.final_zone_name).filter(Boolean)
+      );
+
+      // Count owners per zone
+      const zoneCountMap = new Map();
+      for (const row of (ownerZonesRes.data || [])) {
+        for (const z of (row.linked_zones || [])) {
+          if (z) zoneCountMap.set(z, (zoneCountMap.get(z) || 0) + 1);
+        }
       }
 
-      // Fallback: get zone names from project intelligence (no counts)
-      const { data: projZones } = await agentDb
-        .from('raco_project_intelligence')
-        .select('final_zone_name')
-        .not('final_zone_name', 'is', null)
-        .limit(2000);
+      const zone_stats = [...zoneSet]
+        .map(zone => ({ zone, owner_count: zoneCountMap.get(zone) || 0 }))
+        .sort((a, b) => b.owner_count - a.owner_count || a.zone.localeCompare(b.zone));
 
-      const zoneSet = new Set((projZones || []).map(p => p.final_zone_name).filter(Boolean));
-      const zone_stats = [...zoneSet].map(zone => ({ zone, owner_count: 0 })).sort((a, b) => a.zone.localeCompare(b.zone));
-
-      console.log(`[getOwnerExplorer] zones (fallback) | total: ${zone_stats.length}`);
+      console.log(`[getOwnerExplorer] zones | total: ${zone_stats.length}`);
       return Response.json({ zones: zone_stats.map(z => z.zone), zone_stats });
     }
 
-    // ── TIER 2: Master projects in a zone, with owner counts ─────────────────
-    // Owner counts come from public.v_master_project_owner_counts (pre-calculated,
-    // handles case normalization). Project counts from raco_project_intelligence.
+    // ── TIER 2: Master projects in a zone ────────────────────────────────────
+    // Source of truth: agent.raco_project_intelligence (DISTINCT master_project_name for zone)
+    // Owner counts: scan raco_owner_intelligence.linked_master_project_names (capped at 5000 rows)
     if (action === 'master_projects') {
       if (!zone) return Response.json({ error: 'zone required' }, { status: 400 });
 
-      // Fetch both sources in parallel
-      const [projRes, countsRes] = await Promise.all([
+      // Fetch project intelligence + owner master names in parallel
+      const [projRes, ownerMasterRes] = await Promise.all([
         agentDb
           .from('raco_project_intelligence')
           .select('master_project_name, project')
           .eq('final_zone_name', zone)
           .limit(2000),
-        // v_master_project_owner_counts is in public schema, filter by zone_name
-        publicDb
-          .from('v_master_project_owner_counts')
-          .select('master_project_name, owner_count, zone_name')
-          .eq('zone_name', zone)
-          .limit(500)
-          .then(r => r)
-          .catch(() => ({ data: null })), // view may not exist yet
+        agentDb
+          .from('raco_owner_intelligence')
+          .select('linked_master_project_names')
+          .not('linked_master_project_names', 'is', null)
+          .limit(5000),
       ]);
 
       if (projRes.error || !projRes.data) return Response.json({ master_projects: [] });
 
-      // Build project_count per master from raco_project_intelligence
-      const masterMap = new Map(); // master_name → { name, project_count }
+      // Build master → { project_count } from project intelligence (exact canonical names)
+      const masterMap = new Map();
       for (const p of projRes.data) {
         if (!p.master_project_name) continue;
         const entry = masterMap.get(p.master_project_name) || { name: p.master_project_name, project_count: 0, owner_count: 0 };
@@ -193,19 +196,15 @@ Deno.serve(async (req) => {
         masterMap.set(p.master_project_name, entry);
       }
 
-      // Merge owner counts from view (case-insensitive by doing a map keyed on lower-case)
-      if (countsRes.data) {
-        // Build a lowercase lookup from view results
-        const viewCounts = new Map(); // lower_name → owner_count
-        for (const row of countsRes.data) {
-          if (row.master_project_name) {
-            viewCounts.set(row.master_project_name.toLowerCase(), row.owner_count || 0);
-          }
-        }
-        // Apply to masterMap entries using case-insensitive match
-        for (const [key, entry] of masterMap) {
-          const viewCount = viewCounts.get(key.toLowerCase());
-          if (viewCount != null) entry.owner_count = viewCount;
+      // Count owners per master project (case-insensitive via lowercase map)
+      const lowerToCanonical = new Map();
+      for (const name of masterMap.keys()) lowerToCanonical.set(name.toLowerCase(), name);
+
+      for (const row of (ownerMasterRes.data || [])) {
+        for (const mp of (row.linked_master_project_names || [])) {
+          if (!mp) continue;
+          const canonical = lowerToCanonical.get(mp.toLowerCase());
+          if (canonical) masterMap.get(canonical).owner_count++;
         }
       }
 
