@@ -166,52 +166,82 @@ Deno.serve(async (req) => {
     }
 
     // ── TIER 2: Master projects in a zone ────────────────────────────────────
-    // Source of truth: agent.raco_project_intelligence (DISTINCT master_project_name for zone)
-    // Owner counts: scan raco_owner_intelligence.linked_master_project_names (capped at 5000 rows)
+    // Fetches all owners in the zone, builds a project→master mapping from
+    // raco_project_intelligence, then counts distinct owners per master via
+    // both linked_master_project_names and linked_projects (no double-counting).
     if (action === 'master_projects') {
       if (!zone) return Response.json({ error: 'zone required' }, { status: 400 });
 
-      // Fetch project intelligence + owner master names in parallel
-      const [projRes, ownerMasterRes] = await Promise.all([
+      // Fetch project intelligence for this zone + all zone owners in parallel
+      const [projRes, ownersRes] = await Promise.all([
         agentDb
           .from('raco_project_intelligence')
-          .select('master_project_name, project')
+          .select('project, master_project_name')
           .eq('final_zone_name', zone)
           .limit(10000),
         agentDb
           .from('raco_owner_intelligence')
-          .select('linked_master_project_names')
-          .not('linked_master_project_names', 'is', null)
+          .select('id, linked_zones, linked_master_project_names, linked_projects')
+          .contains('linked_zones', [zone])
           .limit(200000),
       ]);
 
-      if (projRes.error || !projRes.data) return Response.json({ master_projects: [] });
+      if (projRes.error) return Response.json({ master_projects: [] });
 
-      // Build master → { project_count } from project intelligence (exact canonical names)
-      const masterMap = new Map();
-      for (const p of projRes.data) {
-        if (!p.master_project_name) continue;
-        const entry = masterMap.get(p.master_project_name) || { name: p.master_project_name, project_count: 0, owner_count: 0 };
-        if (p.project) entry.project_count++;
-        masterMap.set(p.master_project_name, entry);
+      // Build project → master_project mapping (case-insensitive key)
+      const projToMaster = new Map(); // lowercase_project → canonical_master
+      const masterProjectCount = new Map(); // canonical_master → Set of projects
+      for (const p of (projRes.data || [])) {
+        if (!p.project || !p.master_project_name) continue;
+        projToMaster.set(p.project.toLowerCase(), p.master_project_name);
+        if (!masterProjectCount.has(p.master_project_name)) {
+          masterProjectCount.set(p.master_project_name, new Set());
+        }
+        masterProjectCount.get(p.master_project_name).add(p.project);
       }
 
-      // Count owners per master project (case-insensitive via lowercase map)
-      const lowerToCanonical = new Map();
-      for (const name of masterMap.keys()) lowerToCanonical.set(name.toLowerCase(), name);
+      // Build lowercase → canonical map for master project names
+      const lowerToMaster = new Map();
+      for (const name of masterProjectCount.keys()) lowerToMaster.set(name.toLowerCase(), name);
 
-      for (const row of (ownerMasterRes.data || [])) {
-        for (const mp of (row.linked_master_project_names || [])) {
+      // Count distinct owners per master (using a Set per master to avoid double-counting)
+      const masterOwnerSets = new Map(); // canonical_master → Set of owner ids
+
+      for (const owner of (ownersRes.data || [])) {
+        const assignedMasters = new Set();
+
+        // Path 1: direct linked_master_project_names
+        for (const mp of (owner.linked_master_project_names || [])) {
           if (!mp) continue;
-          const canonical = lowerToCanonical.get(mp.toLowerCase());
-          if (canonical) masterMap.get(canonical).owner_count++;
+          const canonical = lowerToMaster.get(mp.toLowerCase());
+          if (canonical) assignedMasters.add(canonical);
+        }
+
+        // Path 2: resolve via linked_projects → project intelligence mapping
+        for (const proj of (owner.linked_projects || [])) {
+          if (!proj) continue;
+          const master = projToMaster.get(proj.toLowerCase());
+          if (master) assignedMasters.add(master);
+        }
+
+        // Add owner id to each resolved master's set (deduplication via Set)
+        for (const master of assignedMasters) {
+          if (!masterOwnerSets.has(master)) masterOwnerSets.set(master, new Set());
+          masterOwnerSets.get(master).add(owner.id);
         }
       }
 
-      const result = [...masterMap.values()]
+      // Build result — only masters with owner_count > 0
+      const result = [...masterProjectCount.keys()]
+        .map(name => ({
+          name,
+          project_count: masterProjectCount.get(name).size,
+          owner_count: masterOwnerSets.get(name)?.size || 0,
+        }))
+        .filter(m => m.owner_count > 0)
         .sort((a, b) => b.owner_count - a.owner_count || a.name.localeCompare(b.name));
 
-      console.log(`[getOwnerExplorer] master_projects | zone: ${zone} | count: ${result.length} | top: ${result[0]?.name} (${result[0]?.owner_count})`);
+      console.log(`[getOwnerExplorer] master_projects | zone: ${zone} | masters: ${result.length} | top: ${result[0]?.name} (${result[0]?.owner_count})`);
       return Response.json({ master_projects: result });
     }
 
