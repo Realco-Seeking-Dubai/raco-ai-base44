@@ -177,7 +177,7 @@ Deno.serve(async (req) => {
           .from('raco_project_intelligence')
           .select('master_project_name, project')
           .eq('final_zone_name', zone)
-          .limit(2000),
+          .limit(10000),
         agentDb
           .from('raco_owner_intelligence')
           .select('linked_master_project_names')
@@ -223,7 +223,7 @@ Deno.serve(async (req) => {
         .from('raco_project_intelligence')
         .select('project, master_project_name')
         .eq('master_project_name', master_project)
-        .limit(1000);
+        .limit(10000);
 
       if (error || !projRows) return Response.json({ projects: [] });
 
