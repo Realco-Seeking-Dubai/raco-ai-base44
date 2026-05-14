@@ -171,49 +171,59 @@ Deno.serve(async (req) => {
     }
 
     // ── TIER 2: Master projects in a zone, with owner counts ─────────────────
+    // Owner counts come from public.v_master_project_owner_counts (pre-calculated,
+    // handles case normalization). Project counts from raco_project_intelligence.
     if (action === 'master_projects') {
       if (!zone) return Response.json({ error: 'zone required' }, { status: 400 });
 
-      // Get all projects in this zone
-      const { data: projRows, error } = await agentDb
-        .from('raco_project_intelligence')
-        .select('master_project_name, project')
-        .eq('final_zone_name', zone)
-        .limit(2000);
+      // Fetch both sources in parallel
+      const [projRes, countsRes] = await Promise.all([
+        agentDb
+          .from('raco_project_intelligence')
+          .select('master_project_name, project')
+          .eq('final_zone_name', zone)
+          .limit(2000),
+        // v_master_project_owner_counts is in public schema, filter by zone_name
+        publicDb
+          .from('v_master_project_owner_counts')
+          .select('master_project_name, owner_count, zone_name')
+          .eq('zone_name', zone)
+          .limit(500)
+          .then(r => r)
+          .catch(() => ({ data: null })), // view may not exist yet
+      ]);
 
-      if (error || !projRows) return Response.json({ master_projects: [] });
+      if (projRes.error || !projRes.data) return Response.json({ master_projects: [] });
 
-      // Build set of projects per master project
-      const masterProjects = new Map(); // master_name → Set of project names
-      for (const p of projRows) {
+      // Build project_count per master from raco_project_intelligence
+      const masterMap = new Map(); // master_name → { name, project_count }
+      for (const p of projRes.data) {
         if (!p.master_project_name) continue;
-        if (!masterProjects.has(p.master_project_name)) masterProjects.set(p.master_project_name, new Set());
-        if (p.project) masterProjects.get(p.master_project_name).add(p.project);
+        const entry = masterMap.get(p.master_project_name) || { name: p.master_project_name, project_count: 0, owner_count: 0 };
+        if (p.project) entry.project_count++;
+        masterMap.set(p.master_project_name, entry);
       }
 
-      // Get owner counts per master project from owner intelligence
-      // Use .contains / .overlaps on linked_master_project_names if available
-      const masterNames = [...masterProjects.keys()];
-      const ownerCounts = new Map();
+      // Merge owner counts from view (case-insensitive by doing a map keyed on lower-case)
+      if (countsRes.data) {
+        // Build a lowercase lookup from view results
+        const viewCounts = new Map(); // lower_name → owner_count
+        for (const row of countsRes.data) {
+          if (row.master_project_name) {
+            viewCounts.set(row.master_project_name.toLowerCase(), row.owner_count || 0);
+          }
+        }
+        // Apply to masterMap entries using case-insensitive match
+        for (const [key, entry] of masterMap) {
+          const viewCount = viewCounts.get(key.toLowerCase());
+          if (viewCount != null) entry.owner_count = viewCount;
+        }
+      }
 
-      // Batch: for each master project, count owners that have it in linked_master_project_names
-      await Promise.all(masterNames.map(async (mp) => {
-        const { count } = await agentDb
-          .from('raco_owner_intelligence')
-          .select('id', { count: 'exact', head: true })
-          .contains('linked_master_project_names', [mp]);
-        ownerCounts.set(mp, count || 0);
-      }));
-
-      const result = masterNames
-        .map(name => ({
-          name,
-          project_count: masterProjects.get(name).size,
-          owner_count: ownerCounts.get(name) || 0,
-        }))
+      const result = [...masterMap.values()]
         .sort((a, b) => b.owner_count - a.owner_count || a.name.localeCompare(b.name));
 
-      console.log(`[getOwnerExplorer] master_projects | zone: ${zone} | count: ${result.length}`);
+      console.log(`[getOwnerExplorer] master_projects | zone: ${zone} | count: ${result.length} | top: ${result[0]?.name} (${result[0]?.owner_count})`);
       return Response.json({ master_projects: result });
     }
 
@@ -242,13 +252,24 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Get owner counts per project using .contains on linked_projects
+      // Get owner counts per project — try .contains first (exact), fall back to owner_area ilike
       await Promise.all([...projectMap.keys()].map(async (pName) => {
-        const { count } = await agentDb
+        const { count: exactCount } = await agentDb
           .from('raco_owner_intelligence')
           .select('id', { count: 'exact', head: true })
           .contains('linked_projects', [pName]);
-        projectMap.get(pName).owner_count = count || 0;
+
+        if (exactCount && exactCount > 0) {
+          projectMap.get(pName).owner_count = exactCount;
+          return;
+        }
+
+        // Fallback: count by owner_area case-insensitive
+        const { count: areaCount } = await agentDb
+          .from('raco_owner_intelligence')
+          .select('id', { count: 'exact', head: true })
+          .ilike('owner_area', pName);
+        projectMap.get(pName).owner_count = areaCount || 0;
       }));
 
       const projectList = [...projectMap.values()]
