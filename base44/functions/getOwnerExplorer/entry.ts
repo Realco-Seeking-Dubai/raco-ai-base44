@@ -280,6 +280,7 @@ Deno.serve(async (req) => {
       }));
 
       const projectList = [...projectMap.values()]
+        .filter(p => p.owner_count > 0)
         .sort((a, b) => b.owner_count - a.owner_count || a.name.localeCompare(b.name));
 
       console.log(`[getOwnerExplorer] projects | master: ${master_project} | count: ${projectList.length}`);
