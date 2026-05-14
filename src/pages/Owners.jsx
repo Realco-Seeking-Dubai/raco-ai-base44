@@ -1,14 +1,11 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useLens } from '@/lib/LensContext';
-import { Search, Loader2, MapPin, Building2, Home, X, FileSpreadsheet } from 'lucide-react';
+import { Search, Loader2, MapPin, Building2, Home, X, FileSpreadsheet, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import OwnerBreadcrumbs from '@/components/owners/OwnerBreadcrumbs';
 import OwnerCard from '@/components/owners/OwnerCard';
 import OwnerProfileDrawer from '@/components/owners/OwnerProfileDrawer';
-
-// ── Explorer levels ──────────────────────────────────────────────────────────
-// step: 'zones' | 'master_projects' | 'projects' | 'owners'
 
 function GridSkeleton({ n = 6 }) {
   return (
@@ -20,7 +17,7 @@ function GridSkeleton({ n = 6 }) {
   );
 }
 
-function TileButton({ label, icon: Icon, color = 'bg-evergreen-tint text-evergreen', onClick, hasExcel = false, stat = null }) {
+function TileButton({ label, icon: Icon, onClick, hasExcel = false, stat = null }) {
   return (
     <button
       onClick={onClick}
@@ -48,7 +45,7 @@ export default function Owners() {
   const { lensUser } = useLens();
 
   // Navigation state
-  const [step, setStep] = useState('zones'); // 'zones' | 'master_projects' | 'projects' | 'owners'
+  const [step, setStep] = useState('zones');
   const [selectedZone, setSelectedZone] = useState(null);
   const [selectedMaster, setSelectedMaster] = useState(null);
   const [selectedProject, setSelectedProject] = useState(null);
@@ -72,13 +69,12 @@ export default function Owners() {
 
   const agentEmail = lensUser?.email || null;
 
-  // ── API calls ────────────────────────────────────────────────────────────
   function invoke(action, extra = {}) {
     return base44.functions.invoke('getOwnerExplorer', { action, agent_email: agentEmail, ...extra })
       .then(res => res.data);
   }
 
-  // ── Load on mount ───────────────────────────────────────────────────────
+  // Load zones on mount
   useEffect(() => {
     setLoading(true);
     invoke('zones')
@@ -89,7 +85,7 @@ export default function Owners() {
       .finally(() => setLoading(false));
   }, [lensUser]);
 
-  // ── Navigation handlers ──────────────────────────────────────────────────
+  // Drill into zone → master projects
   function drillZone(zone) {
     setSelectedZone(zone);
     setSelectedMaster(null);
@@ -97,50 +93,37 @@ export default function Owners() {
     setOwners([]);
     setStep('master_projects');
     setLoading(true);
-    // master_projects now returns array of { name, owner_count, project_count }
     invoke('master_projects', { zone })
       .then(d => setMasterProjects(d?.master_projects || []))
       .finally(() => setLoading(false));
   }
 
+  // Drill into master project → buildings
   function drillMaster(master) {
-    const masterName = typeof master === 'string' ? master : master.name;
-    setSelectedMaster(masterName);
+    const name = typeof master === 'string' ? master : master.name;
+    setSelectedMaster(name);
     setSelectedProject(null);
     setOwners([]);
     setStep('projects');
     setLoading(true);
-    invoke('projects', { master_project: masterName })
+    invoke('projects', { master_project: name })
       .then(d => setProjects(d?.projects || []))
       .finally(() => setLoading(false));
   }
 
-  // Hard-coded normalization for fragmented project names
-  const normalizeProject = (name) => {
-    const MAP = {
-      'Murooj Al Furjan 1': 'Murooj Al Furjan',
-      'Murooj Al Furjan 2': 'Murooj Al Furjan',
-      'Murooj Al Furjan West': 'Murooj Al Furjan',
-      'Murooj 1': 'Murooj Al Furjan',
-      'Murooj 2': 'Murooj Al Furjan',
-      'Tilal Al Furjan 1': 'Tilal Al Furjan',
-      'Tilal Al Furjan 2': 'Tilal Al Furjan',
-    };
-    return MAP[name] || name;
-  };
-
+  // Drill into building → owners
   function drillProject(projectName) {
-    const normalized = normalizeProject(projectName);
-    setSelectedProject(normalized);
+    const name = typeof projectName === 'string' ? projectName : projectName.name;
+    setSelectedProject(name);
     setOwners([]);
     setStep('owners');
     setLoading(true);
-    invoke('owners_by_project', { project: normalized })
+    invoke('owners_by_project', { project: name })
       .then(d => setOwners(d?.owners || []))
       .finally(() => setLoading(false));
   }
 
-  // ── Breadcrumb navigation (go back up) ───────────────────────────────────
+  // Breadcrumb navigation
   const crumbs = [{ label: 'Owners', key: 'root' }];
   if (selectedZone) crumbs.push({ label: selectedZone, key: 'zone' });
   if (selectedMaster) crumbs.push({ label: selectedMaster, key: 'master' });
@@ -152,7 +135,7 @@ export default function Owners() {
     else if (idx === 2) { setStep('projects'); setSelectedProject(null); }
   }
 
-  // ── Search ───────────────────────────────────────────────────────────────
+  // Search with debounce
   useEffect(() => {
     if (!search.trim() || search.trim().length < 2) {
       setSearchMode(false);
@@ -175,23 +158,12 @@ export default function Owners() {
     setSearchResults([]);
   }
 
-  // ── Render helpers ────────────────────────────────────────────────────────
-  const ZONE_COLORS = {
-    Core:        'bg-evergreen-tint text-evergreen',
-    Suburbs:     'bg-brass-tint text-brass',
-    Waterfront:  'bg-sky-tint text-sky',
-    'MBR City':  'bg-terracotta-tint text-terracotta',
-    'Dubai South':'bg-surface-2 text-muted-foreground',
-  };
-
   return (
     <div className="p-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 mb-2">
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">Owner Database</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Browse by zone → community → building, or search 182k owners</p>
-        </div>
+      <div className="mb-2">
+        <h1 className="text-xl font-semibold text-foreground">Owner Database</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">Browse by zone → community → building, or search 182k owners</p>
       </div>
 
       {/* Search bar */}
@@ -210,7 +182,7 @@ export default function Owners() {
         )}
       </div>
 
-      {/* Search mode */}
+      {/* Search results */}
       {searchMode ? (
         <div>
           {searching ? (
@@ -235,7 +207,7 @@ export default function Owners() {
           {/* Breadcrumbs */}
           <OwnerBreadcrumbs crumbs={crumbs} onNavigate={handleBreadcrumb} />
 
-          {/* Explorer */}
+          {/* Explorer tiers */}
           {loading ? (
             <GridSkeleton n={6} />
           ) : step === 'zones' ? (
@@ -247,13 +219,13 @@ export default function Owners() {
                     key={zone}
                     label={zone}
                     icon={MapPin}
-                    color={ZONE_COLORS[zone] || 'bg-surface-2 text-muted-foreground'}
                     onClick={() => drillZone(zone)}
                     stat={stat?.owner_count || null}
                   />
                 );
               })}
             </div>
+
           ) : step === 'master_projects' ? (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {masterProjects.length === 0 ? (
@@ -262,24 +234,25 @@ export default function Owners() {
                 const name = typeof m === 'string' ? m : m.name;
                 const ownerCount = typeof m === 'object' ? m.owner_count : null;
                 return (
-                  <TileButton key={name} label={name} icon={Building2} color="bg-brass-tint text-brass" stat={ownerCount} onClick={() => drillMaster(name)} />
+                  <TileButton key={name} label={name} icon={Building2} stat={ownerCount} onClick={() => drillMaster(m)} />
                 );
               })}
             </div>
+
           ) : step === 'projects' ? (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {projects.length === 0 ? (
                 <div className="col-span-full text-sm text-muted-foreground py-8 text-center">No buildings found in {selectedMaster}.</div>
               ) : projects.map(p => {
-                const rawName = typeof p === 'string' ? p : p.name;
-                const displayName = normalizeProject(rawName);
+                const name = typeof p === 'string' ? p : p.name;
                 const hasExcel = typeof p === 'object' && p.has_excel;
                 const ownerCount = typeof p === 'object' ? p.owner_count : null;
                 return (
-                  <TileButton key={displayName} label={displayName} icon={Home} color="bg-sky-tint text-sky" hasExcel={hasExcel} stat={ownerCount} onClick={() => drillProject(displayName)} />
+                  <TileButton key={name} label={name} icon={Home} hasExcel={hasExcel} stat={ownerCount} onClick={() => drillProject(p)} />
                 );
               })}
             </div>
+
           ) : step === 'owners' ? (
             <div>
               {owners.length === 0 ? (
