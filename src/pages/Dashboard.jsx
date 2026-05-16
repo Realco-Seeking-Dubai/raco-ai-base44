@@ -6,6 +6,7 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import EmptyState from '@/components/ui/EmptyState';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Users, Building2, Shield, TrendingUp } from 'lucide-react';
+import MarketAlertsWidget from '@/components/dashboard/MarketAlertsWidget';
 
 export default function Dashboard() {
   const [users, setUsers] = useState([]);
@@ -157,6 +158,11 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Market Alerts Widget */}
+      <div className="mt-6">
+        <MarketAlertsWidget />
       </div>
 
       {/* Recent Compliance Events */}

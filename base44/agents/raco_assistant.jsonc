@@ -1,6 +1,72 @@
 {
   "description": "Raco AI \u2014 the intelligence assistant for Raco AI platform. Helps agents with leads, owner intelligence, market trends, deal pipeline, and message drafting.",
   "instructions": "You are Raco AI, the intelligent assistant for a Dubai real estate platform. You have deep knowledge of the owner database (182k owners), market intelligence, leads pipeline, deals, and project hierarchy (zones \u2192 master projects \u2192 buildings). When answering:\n- Be concise and actionable.\n- Use data from the available tools when relevant.\n- For owner queries, search by name, mobile, property ID, or zone.\n- For market questions, reference project intelligence data.\n- Draft professional WhatsApp/email messages in a warm but professional tone when asked.\n- Always address the user by their first name if known.",
-  "tool_configs": [],
+  "tool_configs": [
+    {
+      "function_name": "getOwnerExplorer",
+      "description": "Search and explore the 182k owner database by zone, master project, building, or free-text search"
+    },
+    {
+      "function_name": "getLeads",
+      "description": "Fetch leads pipeline data for the current user"
+    },
+    {
+      "function_name": "getDashboardStats",
+      "description": "Fetch KPI stats for the dashboard"
+    },
+    {
+      "function_name": "getMarketInsights",
+      "description": "Fetch market trend data and insights"
+    },
+    {
+      "function_name": "getProjectList",
+      "description": "Fetch the list of projects and master projects"
+    },
+    {
+      "entity_name": "SuperAgent",
+      "allowed_operations": [
+        "read"
+      ]
+    },
+    {
+      "entity_name": "Automation",
+      "allowed_operations": [
+        "read"
+      ]
+    },
+    {
+      "entity_name": "AgentReportSchedule",
+      "allowed_operations": [
+        "read"
+      ]
+    },
+    {
+      "entity_name": "InquiryBroadcast",
+      "allowed_operations": [
+        "read"
+      ]
+    },
+    {
+      "function_name": "getPocketInventory",
+      "description": "Fetch pocket listing inventory"
+    },
+    {
+      "function_name": "getWorkspaceAssignments",
+      "description": "Fetch user workspace/scope assignments"
+    }
+  ],
+  "context_files": [],
+  "app_user_connector_configs": [],
+  "selected_skill_names": [],
+  "selected_workspace_skill_ids": [],
+  "model": "automatic",
+  "whatsapp_greeting": null,
+  "telegram_greeting": null,
+  "line_greeting": null,
+  "memory_config": {
+    "enabled": true,
+    "scope": "both",
+    "instructions": null
+  },
   "name": "raco_assistant"
 }

@@ -196,7 +196,7 @@ export default function Owners() {
               <div className="text-xs text-muted-foreground mb-3">{searchResults.length} result{searchResults.length !== 1 ? 's' : ''}</div>
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {searchResults.map(o => (
-                  <OwnerCard key={o.id} owner={o} onClick={o => setProfileOwnerId(o.id)} />
+                  <OwnerCard key={o.id} owner={o} onClick={o => setProfileOwnerId(o.id)} currentProject={null} />
                 ))}
               </div>
             </>
@@ -266,7 +266,7 @@ export default function Owners() {
                   </div>
                   <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {owners.map(o => (
-                      <OwnerCard key={o.id} owner={o} onClick={o => setProfileOwnerId(o.id)} />
+                      <OwnerCard key={o.id} owner={o} onClick={o => setProfileOwnerId(o.id)} currentProject={selectedProject} />
                     ))}
                   </div>
                 </>

@@ -1,5 +1,7 @@
-import { Phone, Mail, Building2, MapPin, Database, FileSpreadsheet, RefreshCw, Star } from 'lucide-react';
+import { useState } from 'react';
+import { Phone, Mail, Building2, MapPin, Database, FileSpreadsheet, RefreshCw, MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import OwnerWhatsAppModal from './OwnerWhatsAppModal';
 
 function SourceBadge({ sourceLabel, sourceSystem }) {
   const isExcel = sourceSystem === 'excel' || (sourceLabel || '').toLowerCase().includes('excel');
@@ -27,14 +29,14 @@ function ConfidenceDot({ score }) {
   );
 }
 
-export default function OwnerCard({ owner, onClick }) {
+export default function OwnerCard({ owner, onClick, currentProject }) {
+  const [showWA, setShowWA] = useState(false);
   const reconnectSoon = owner.reconnect_due_at && new Date(owner.reconnect_due_at) <= new Date(Date.now() + 7 * 86400000);
 
   return (
-    <button
-      onClick={() => onClick(owner)}
-      className="text-left w-full bg-card border border-hairline rounded-xl p-4 hover:shadow-sm hover:border-evergreen/40 transition-all group"
-    >
+    <>
+    <div className="relative text-left w-full bg-card border border-hairline rounded-xl p-4 hover:shadow-sm hover:border-evergreen/40 transition-all group">
+      <button className="absolute inset-0 w-full h-full" onClick={() => onClick(owner)} />
       {/* Name row */}
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="text-sm font-semibold text-foreground group-hover:text-evergreen transition-colors truncate leading-tight">
@@ -89,7 +91,24 @@ export default function OwnerCard({ owner, onClick }) {
             <RefreshCw className="w-2.5 h-2.5" /> Reconnect due
           </span>
         )}
+        {owner.mobile && (
+          <button
+            className="relative z-10 ml-auto flex items-center gap-1 px-2 py-1 rounded-lg bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366]/20 transition-colors font-medium text-[10px]"
+            onClick={e => { e.stopPropagation(); setShowWA(true); }}
+          >
+            <MessageCircle className="w-3 h-3" /> WhatsApp
+          </button>
+        )}
       </div>
-    </button>
+    </div>
+
+    {showWA && (
+      <OwnerWhatsAppModal
+        owner={owner}
+        project={currentProject}
+        onClose={() => setShowWA(false)}
+      />
+    )}
+    </>
   );
 }
