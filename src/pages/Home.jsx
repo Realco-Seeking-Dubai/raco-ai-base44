@@ -35,7 +35,9 @@ export default function Home() {
     setLoading(true);
     Promise.all([
       getAiSuggestions(queryEmail),
-      getAgentTasks(queryEmail),
+      base44.functions.invoke('manageAssignments', { action: 'list', agent_email: queryEmail })
+        .then(res => res.data?.assigned_to_me?.filter(t => t.status !== 'completed') || [])
+        .catch(() => []),
       getActivityTimeline(queryEmail),
       getDeals(),
       base44.entities.SuperAgent.list(),
@@ -145,8 +147,8 @@ export default function Home() {
                 <div key={t.id} className="px-4 py-3 flex items-center gap-3">
                   <CheckCircle2 className="w-4 h-4 text-muted-2 shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-foreground truncate">{t.task_title}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">{t.task_type}</div>
+                    <div className="text-sm font-medium text-foreground truncate">{t.title}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{t.type}</div>
                   </div>
                   <StatusBadge status={t.status} />
                 </div>
