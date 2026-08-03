@@ -72,7 +72,7 @@ function TaskRow({ task, view, onComplete }) {
           )}
         </div>
       </div>
-      {task.priority && task.priority !== 'normal' && (
+      {task.priority && !['medium', 'low'].includes(task.priority) && (
         <span className="text-[10px] uppercase font-semibold text-terracotta bg-terracotta-tint px-1.5 py-0.5 rounded shrink-0">
           {task.priority}
         </span>
@@ -85,7 +85,7 @@ function TaskRow({ task, view, onComplete }) {
 function NewAssignmentModal({ onClose, onCreated, pixxiUsers, myEmail }) {
   const { toast } = useToast();
   const [form, setForm] = useState({
-    title: '', type: 'call', assigned_to: myEmail || '', due_date: '', priority: 'normal', reason: '',
+    title: '', type: 'call', assigned_to: myEmail || '', due_date: '', priority: 'medium', reason: '',
   });
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -167,9 +167,10 @@ function NewAssignmentModal({ onClose, onCreated, pixxiUsers, myEmail }) {
               value={form.priority}
               onChange={e => set('priority', e.target.value)}
             >
-              <option value="normal">Normal</option>
+              <option value="low">Low</option>
+              <option value="medium">Normal</option>
               <option value="high">High</option>
-              <option value="urgent">Urgent</option>
+              <option value="critical">Urgent</option>
             </select>
           </div>
         </div>
