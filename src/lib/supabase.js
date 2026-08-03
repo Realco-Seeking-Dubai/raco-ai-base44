@@ -77,14 +77,18 @@ export async function getAiSuggestions(userEmail) {
 // ─── Tasks ────────────────────────────────────────────────────────────────
 
 export async function getAgentTasks(userEmail) {
+  // NOTE: public.tasks columns are title/type/priority (not task_title/priority_score).
   const { data, error } = await supabase
     .from('tasks')
     .select('*')
     .eq('assigned_to', userEmail)
     .neq('status', 'completed')
-    .order('priority_score', { ascending: false, nullsFirst: false })
+    .order('due_date', { ascending: true, nullsFirst: false })
     .limit(20);
-  if (error) return [];
+  if (error) {
+    console.warn('tasks query error:', error);
+    return [];
+  }
   return data || [];
 }
 
