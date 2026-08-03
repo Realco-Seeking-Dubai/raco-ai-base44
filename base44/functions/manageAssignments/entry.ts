@@ -48,16 +48,20 @@ Deno.serve(async (req) => {
         return Response.json({ error: 'title and assigned_to are required' }, { status: 400 });
       }
       const taskType = VALID_TYPES.includes(type) ? type : 'manual';
+      const VALID_PRIORITIES = ['low', 'medium', 'high', 'critical'];
       const { data, error } = await supabase.from('tasks').insert({
         title,
         type: taskType,
         status: 'new',
-        priority: priority || 'normal',
+        priority: VALID_PRIORITIES.includes(priority) ? priority : 'medium',
         assigned_to,
         assigned_by: user.email,
         due_date: due_date || null,
         reason: reason || null,
-        created_by_service: 'raco_crm_assignments',
+        source_type: 'manual',
+        source_record_id: `assignments_page:${user.email}`,
+        owner_id: user.email,
+        created_by_service: 'assignments_page',
         metadata: { route: 'base_echo', source: 'assignments_page' },
       }).select().single();
       if (error) return Response.json({ error: error.message }, { status: 500 });
