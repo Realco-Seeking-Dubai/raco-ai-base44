@@ -1,0 +1,101 @@
+{
+  "type": "object",
+  "name": "SuperAgent",
+  "description": "Specialized AI agents that perform tasks within Raco AI. Each agent has skills, scope, and integration sources. Rocco AI orchestrates them.",
+  "properties": {
+    "agent_name": {
+      "type": "string",
+      "description": "Display name (e.g., 'Rocco AI', 'Property Monitor Scout')"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "Orchestrator",
+        "Market Data Specialist",
+        "Outreach Specialist",
+        "Intent Detection Specialist",
+        "Strategy Specialist",
+        "Data Scope Guardian",
+        "Marketing Specialist"
+      ]
+    },
+    "description": {
+      "type": "string",
+      "description": "What this agent does"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "skills": {
+      "type": "array",
+      "description": "Array of skill objects: {skill_name, description, rpc_function, enabled}",
+      "items": {
+        "type": "object"
+      }
+    },
+    "access_permissions": {
+      "type": "array",
+      "description": "User roles allowed to trigger this agent",
+      "items": {
+        "type": "string"
+      }
+    },
+    "zone_scope": {
+      "type": "array",
+      "description": "Zone IDs this agent operates in (empty = all zones for the user)",
+      "items": {
+        "type": "string"
+      }
+    },
+    "owner_data_scope": {
+      "type": "object",
+      "description": "Filter criteria for owner pool"
+    },
+    "working_style": {
+      "type": "object",
+      "description": "Agent personality/preferences (tone, creativity, sensitivity)"
+    },
+    "integration_sources": {
+      "type": "array",
+      "description": "External APIs/tools this agent uses",
+      "items": {
+        "type": "string"
+      }
+    },
+    "communicates_with": {
+      "type": "array",
+      "description": "Other agent_names this agent talks to",
+      "items": {
+        "type": "string"
+      }
+    },
+    "triggered_by_events": {
+      "type": "array",
+      "description": "Event names that wake this agent",
+      "items": {
+        "type": "string"
+      }
+    },
+    "last_triggered_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "trigger_count": {
+      "type": "integer",
+      "default": 0
+    },
+    "success_rate": {
+      "type": "number",
+      "description": "% successful completions"
+    },
+    "avatar_emoji": {
+      "type": "string",
+      "description": "Visual identifier in UI"
+    }
+  },
+  "required": [
+    "agent_name",
+    "role"
+  ]
+}

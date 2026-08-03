@@ -1,0 +1,86 @@
+{
+  "description": "Pixxi users are NOT auto-activated. Activation requires approval from 4 designated approvers (Irfan, Gibran, +2 others). Tracks the approval flow.",
+  "name": "UserActivationRequest",
+  "properties": {
+    "approval_status": {
+      "default": "pending",
+      "enum": [
+        "pending",
+        "approved",
+        "rejected",
+        "expired"
+      ],
+      "type": "string"
+    },
+    "approved_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "approved_by_users": {
+      "description": "Emails of approvers who said yes. Max 4 entries.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "approvers_required": {
+      "description": "Designated approvers (max 4)",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "assigned_projects": {
+      "description": "Initial sub-project scope",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "assigned_zones": {
+      "description": "Initial zone scope",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "pixxi_email": {
+      "description": "The pixxi_users.pixxi_email being activated",
+      "type": "string"
+    },
+    "primary_email": {
+      "description": "The @realco.ai email to create/use",
+      "type": "string"
+    },
+    "rejected_by": {
+      "type": "string"
+    },
+    "rejection_reason": {
+      "type": "string"
+    },
+    "requested_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "requested_by": {
+      "description": "User who initiated the request",
+      "type": "string"
+    },
+    "requested_role": {
+      "enum": [
+        "sales_agent",
+        "listing_admin",
+        "sales_manager",
+        "marketing_manager",
+        "compliance_officer",
+        "super_admin"
+      ],
+      "type": "string"
+    }
+  },
+  "required": [
+    "pixxi_email",
+    "approvers_required"
+  ],
+  "type": "object"
+}

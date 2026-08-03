@@ -1,0 +1,87 @@
+{
+  "description": "Scheduled report delivery from a SuperAgent. Reports go via WhatsApp/email/Slack at a cron schedule, filtered by user's scope.",
+  "name": "AgentReportSchedule",
+  "properties": {
+    "agent_id": {
+      "description": "FK to SuperAgent.id",
+      "type": "string"
+    },
+    "content_template": {
+      "description": "Template variables: {market_summary}, {owners_to_reconnect}, {leads_today}",
+      "type": "string"
+    },
+    "cron_schedule": {
+      "description": "e.g., '0 8 * * MON' = 8am every Monday",
+      "type": "string"
+    },
+    "delivery_channel": {
+      "enum": [
+        "whatsapp",
+        "email",
+        "slack",
+        "in_app"
+      ],
+      "type": "string"
+    },
+    "filter_by_owner_status": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "filter_by_zones": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "is_enabled": {
+      "default": true,
+      "type": "boolean"
+    },
+    "last_run_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "last_run_status": {
+      "enum": [
+        "success",
+        "failed",
+        "skipped"
+      ],
+      "type": "string"
+    },
+    "next_run_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "recipient_user_id": {
+      "description": "User receiving the report",
+      "type": "string"
+    },
+    "report_name": {
+      "type": "string"
+    },
+    "report_type": {
+      "enum": [
+        "daily_brief",
+        "weekly_market_summary",
+        "owner_reconnect_list",
+        "campaign_performance",
+        "deals_pipeline",
+        "compliance_audit"
+      ],
+      "type": "string"
+    },
+    "timezone": {
+      "default": "Asia/Dubai",
+      "type": "string"
+    }
+  },
+  "required": [
+    "agent_id",
+    "report_type",
+    "cron_schedule"
+  ],
+  "type": "object"
+}

@@ -1,0 +1,84 @@
+{
+  "description": "Office-wide inquiry broadcasting. When a buyer/seller inquiry comes in, broadcast to all relevant agents. Match against their listings. Inter-agent listing matching.",
+  "name": "InquiryBroadcast",
+  "properties": {
+    "broadcast_status": {
+      "default": "open",
+      "enum": [
+        "open",
+        "matched",
+        "fulfilled",
+        "expired",
+        "cancelled"
+      ],
+      "type": "string"
+    },
+    "broadcast_to_zones": {
+      "description": "Zones included in broadcast",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "buyer_inquiry": {
+      "description": "Inquiry details: bedrooms, budget, zones, property_type, urgency",
+      "type": "object"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "inquiry_source": {
+      "enum": [
+        "whatsapp",
+        "email",
+        "portal",
+        "walk_in",
+        "referral"
+      ],
+      "type": "string"
+    },
+    "inquiry_type": {
+      "enum": [
+        "buyer_seeking",
+        "seller_listing",
+        "tenant_seeking",
+        "landlord_offering"
+      ],
+      "type": "string"
+    },
+    "matched_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "matched_by_agent": {
+      "type": "string"
+    },
+    "matched_listing_ids": {
+      "description": "Pixxi inventory + realco13_listings IDs that match",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "received_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "responding_agents": {
+      "description": "Agents who have responded with matching inventory",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "submitted_by_user": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "inquiry_type",
+    "buyer_inquiry"
+  ],
+  "type": "object"
+}

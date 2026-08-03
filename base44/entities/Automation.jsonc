@@ -1,0 +1,65 @@
+{
+  "description": "Event-driven automation rules. Triggered by user actions or system events. Executes a sequence of agent actions.",
+  "name": "Automation",
+  "properties": {
+    "actions": {
+      "description": "Sequence: [{agent_name, action, params, on_success, on_failure}]",
+      "items": {
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "assigned_agents": {
+      "description": "Which SuperAgents participate",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "automation_name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "execution_count": {
+      "default": 0,
+      "type": "integer"
+    },
+    "is_enabled": {
+      "default": true,
+      "type": "boolean"
+    },
+    "last_executed_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "success_count": {
+      "default": 0,
+      "type": "integer"
+    },
+    "trigger_condition": {
+      "description": "JSON logic expression evaluated against the event payload",
+      "type": "object"
+    },
+    "trigger_type": {
+      "enum": [
+        "user_onboarding",
+        "owner_opened",
+        "message_sent",
+        "message_received",
+        "lead_received",
+        "listing_created",
+        "campaign_scheduled",
+        "manual_invocation",
+        "scheduled"
+      ],
+      "type": "string"
+    }
+  },
+  "required": [
+    "automation_name",
+    "trigger_type"
+  ],
+  "type": "object"
+}

@@ -1,0 +1,56 @@
+{
+  "description": "Each SuperAgent's WhatsApp Business connection. Stores credentials, status, and heartbeat.",
+  "name": "AgentWhatsAppConnection",
+  "properties": {
+    "agent_id": {
+      "description": "FK to SuperAgent.id",
+      "type": "string"
+    },
+    "agent_name": {
+      "description": "Denormalized for quick reads",
+      "type": "string"
+    },
+    "business_account_id": {
+      "description": "WhatsApp Business Account ID",
+      "type": "string"
+    },
+    "connection_status": {
+      "default": "disconnected",
+      "enum": [
+        "connected",
+        "disconnected",
+        "auth_failed",
+        "rate_limited"
+      ],
+      "type": "string"
+    },
+    "daily_send_limit": {
+      "default": 250,
+      "type": "integer"
+    },
+    "daily_sent_count": {
+      "default": 0,
+      "type": "integer"
+    },
+    "last_heartbeat_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "phone_number_id": {
+      "description": "WhatsApp Cloud API phone_number_id",
+      "type": "string"
+    },
+    "webhook_url": {
+      "description": "Inbound message webhook for this agent",
+      "type": "string"
+    },
+    "whatsapp_number": {
+      "description": "E.164 format (e.g., +971501234567)",
+      "type": "string"
+    }
+  },
+  "required": [
+    "agent_id"
+  ],
+  "type": "object"
+}
